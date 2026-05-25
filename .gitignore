@@ -21,3 +21,4 @@ env/
 
 Backend.FastAPI - Copy/
 *.bak
+*.log
