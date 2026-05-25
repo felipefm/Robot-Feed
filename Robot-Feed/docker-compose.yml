@@ -1,0 +1,66 @@
+name: robot_feed
+services:
+    yt-monitor:
+        build:
+            context: /DATA/AppData/robot-feed/Robot-Feed
+            dockerfile: Dockerfile
+        cpu_shares: 90
+        command: []
+        container_name: yt-monitor
+        deploy:
+            resources:
+                limits:
+                    memory: "8136949760"
+        environment:
+            PYTHONPATH: /app
+        extra_hosts:
+            - host.docker.internal:host-gateway
+        hostname: yt-monitor
+        image: yt-monitor:prd
+        labels:
+            icon: https://icon.casaos.io/main/all/youtube.png
+        networks:
+            default: null
+        ports:
+            - mode: ingress
+              target: 5000
+              published: "5000"
+              protocol: tcp
+        privileged: true
+        restart: unless-stopped
+        volumes:
+            - type: bind
+              source: /DATA/AppData/robot-feed/Robot-Feed/data
+              target: /app/data
+              bind:
+                create_host_path: true
+            - type: bind
+              source: /DATA/AppData/robot-feed/Robot-Feed/logs
+              target: /app/logs
+              bind:
+                create_host_path: true
+            - type: bind
+              source: /DATA/AppData/robot-feed/Robot-Feed
+              target: /app
+              bind:
+                create_host_path: true
+            - type: bind
+              source: /etc/localtime
+              target: /etc/localtime
+              read_only: true
+              bind:
+                create_host_path: true
+networks:
+    default:
+        name: robot_feed_default
+x-casaos:
+    author: self
+    category: self
+    hostname: ""
+    icon: https://icon.casaos.io/main/all/youtube.png
+    index: /
+    is_uncontrolled: false
+    port_map: "5000"
+    scheme: http
+    title:
+        custom: Monitor Robot Feed

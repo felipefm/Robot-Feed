@@ -1,0 +1,23 @@
+# Ignorar bancos de dados (MUITO IMPORTANTE)
+*.sqlite
+*.sqlite3
+*.db
+/data/
+/db/
+
+# Ignorar arquivos temporários do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignorar ambientes virtuais (se tiver)
+venv/
+env/
+
+# Ignorar arquivos de variáveis de ambiente com senhas (se você criar um no futuro)
+.env
+
+/var/
+
+Backend.FastAPI - Copy/
+*.bak

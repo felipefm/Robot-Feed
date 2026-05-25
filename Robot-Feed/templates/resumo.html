@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumo de Vídeo - Robot Feed</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+
+        .hero-section {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 40px 0;
+            border-radius: 0 0 20px 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .card { box-shadow: 0 8px 20px rgba(0,0,0,0.05); border: none; border-radius: 12px; }
+        .card-header { font-weight: bold; background-color: white; border-bottom: 1px solid #f0f0f0; border-radius: 12px 12px 0 0 !important; }
+        .summary-container {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #333;
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            border-left: 5px solid #3498db;
+        }
+
+        .loading-overlay {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        .spinner-border { width: 3rem; height: 3rem; color: #3498db; }
+
+        /* Estilos para as abas no modo escuro */
+        .nav-tabs .nav-link {
+            background-color: transparent;
+            border-color: transparent;
+            color: #adb5bd;
+        }
+        .nav-tabs .nav-link.active {
+            background-color: #212529;
+            border-color: #495057;
+            color: #fff;
+        }
+        .nav-tabs .nav-link:hover { border-color: #495057; }
+    </style>
+</head>
+<body>
+    {% include 'navbar.html' %}
+    
+    <div class="hero-section text-center">
+        <div class="container">
+            <h1 class="display-5 fw-bold">📝 Resumo Inteligente</h1>
+            <p class="lead mb-0">Cole a URL de um vídeo do YouTube e deixe o Robot Feed extrair o essencial para você.</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                
+                <div class="card bg-dark border-secondary mb-4">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="card-title text-info mb-1"><i class="fas fa-layer-group"></i> Fila de Processamento Automático</h5>
+                            <p class="card-text text-muted mb-0" id="fila-texto">Verificando status da fila...</p>
+                        </div>
+                        <div class="text-center">
+                            <span class="badge bg-warning text-dark fs-4" id="fila-contador">-</span>
+                            <div class="text-muted small mt-1">Pendentes</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card bg-dark border-secondary mb-4">
+                    <div class="card-header border-secondary text-warning">
+                        <h5 class="mb-0"><i class="fas fa-layer-group"></i> Adicionar Lote à Fila</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="filaForm" action="{{ url_for('resumo.add_to_queue_web') }}" method="POST">
+                            <div class="input-group mb-2">
+                                <span class="input-group-text bg-dark border-secondary text-muted">
+                                    <i class="fab fa-youtube text-danger"></i>
+                                </span>
+                                <input type="url" id="filaVideoUrl" name="video_url" class="form-control bg-dark text-light border-secondary" placeholder="Cole o link do YouTube aqui (Ex: https://youtu.be/...)" required>
+                                <button type="submit" id="btnFilaSubmit" class="btn btn-warning fw-bold text-dark">
+                                    <i class="fas fa-plus"></i> Pôr na Fila
+                                </button>
+                            </div>
+                        </form>
+                        <div id="filaFeedback" class="alert mt-2" style="display: none;"></div>
+                        <small class="text-muted"><i class="fas fa-info-circle"></i> O vídeo será processado automaticamente em segundo plano. Você pode colar quantos links quiser.</small>
+                    </div>
+                </div>
+
+                <div class="card bg-dark border-secondary mb-4 shadow-sm" id="tabela-fila-container" style="display: none;">
+                    <div class="card-header border-secondary text-info bg-dark">
+                        <h6 class="mb-0 pt-1"><i class="fas fa-list-ol"></i> Vídeos Aguardando Processamento</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-dark table-hover mb-0 text-center align-middle">
+                                <thead class="table-active">
+                                    <tr>
+                                        <th scope="col" width="10%">Posição</th>
+                                        <th scope="col" class="text-start">URL do Vídeo</th>
+                                        <th scope="col" width="20%">Status</th>
+                                        <th scope="col" width="15%">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="corpo-tabela-fila">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card com Abas para Seleção de Modo -->
+                <div class="card bg-dark border-secondary mb-4">
+                    <div class="card-header p-0 border-secondary">
+                        <ul class="nav nav-tabs nav-fill" id="summaryTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="youtube-tab" data-bs-toggle="tab" data-bs-target="#youtube-tab-pane" type="button" role="tab" aria-controls="youtube-tab-pane" aria-selected="true">
+                                    <i class="fab fa-youtube text-danger me-1"></i> YouTube
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="texto-tab" data-bs-toggle="tab" data-bs-target="#texto-tab-pane" type="button" role="tab" aria-controls="texto-tab-pane" aria-selected="false">
+                                    <i class="fas fa-paste me-1"></i> Texto Manual
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="tab-content" id="summaryTabContent">
+                            <!-- Aba YouTube -->
+                            <div class="tab-pane fade show active" id="youtube-tab-pane" role="tabpanel" aria-labelledby="youtube-tab" tabindex="0">
+                                <form id="resumoForm">
+                                    <div class="input-group input-group-lg">
+                                        <span class="input-group-text bg-dark border-secondary text-muted">🔗</span>
+                                        <input type="url" id="videoUrl" class="form-control bg-dark text-light border-secondary" placeholder="https://www.youtube.com/watch?v=..." required>
+                                        <button class="btn btn-primary px-4" type="submit" id="btnResumir">Resumir</button>
+                                    </div>
+                                </form>
+                            </div>
+                            <!-- Aba Texto Manual -->
+                            <div class="tab-pane fade" id="texto-tab-pane" role="tabpanel" aria-labelledby="texto-tab" tabindex="0">
+                                <form id="textoManualForm">
+                                    <div class="mb-3">
+                                        <label for="manualTitle" class="form-label text-muted">Título do Assunto</label>
+                                        <input type="text" id="manualTitle" class="form-control bg-dark text-light border-secondary" placeholder="Ex: Relatório de Vendas Q3" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="manualText" class="form-label text-muted">Conteúdo para Resumir</label>
+                                        <textarea id="manualText" class="form-control bg-dark text-light border-secondary" rows="10" placeholder="Cole aqui o texto, artigo, transcrição, etc..." required></textarea>
+                                    </div>
+                                    <div class="d-grid"><button class="btn btn-success btn-lg" type="submit" id="btnResumirTexto">Resumir Conteúdo Local</button></div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" id="resultCard" style="display: none;">
+                    <div class="card-header d-flex justify-content-between align-items-center p-3">
+                        <h5 class="mb-0">📋 Resultado do Resumo</h5>
+                        <button class="btn btn-sm btn-outline-secondary" id="btnCopiar">Copiar Texto</button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="loading" class="loading-overlay">
+                            <div class="spinner-border mb-3" role="status"></div>
+                            <h5 class="text-muted font-monospace">Analisando o vídeo... Isso pode levar alguns minutos.</h5>
+                        </div>
+                        
+                        <!-- Área do Resumo Principal -->
+                        <div id="summaryResult" class="summary-container m-3" style="display: none;">
+                            <!-- O resumo aparecerá aqui -->
+                        </div>
+                        
+                        <!-- Metadados (Tokens e Data) -->
+                        <div id="metaInfo" class="mx-3 mb-3" style="display: none;">
+                            <span class="badge bg-info text-dark" id="metaTokens"></span>
+                            <span class="badge bg-success" id="metaCost" title="Baseado em US$ 0,50 por 1M de tokens (Gemini Flash)"></span>
+                            <span class="badge bg-light text-dark border" id="metaDate"></span>
+                            <span class="badge bg-secondary" id="metaProvider"></span>
+                        </div>
+
+                        <!-- Acordeão para a Transcrição Completa -->
+                        <div class="accordion m-3" id="accordionTranscript" style="display: none;">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingTranscript">
+                                    <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTranscript" aria-expanded="false" aria-controls="collapseTranscript">
+                                        📜 Ver Transcrição Completa
+                                    </button>
+                                </h2>
+                                <div id="collapseTranscript" class="accordion-collapse collapse" aria-labelledby="headingTranscript">
+                                    <div class="accordion-body bg-light text-muted font-monospace" style="max-height: 400px; overflow-y: auto; font-size: 0.85em; white-space: pre-wrap;" id="transcriptResult">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="errorResult" class="alert alert-danger m-3" style="display: none;">
+                            <!-- Erros aparecerão aqui -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        // --- LÓGICA DE RESUMO (URL E TEXTO) ---
+        let currentRawSummary = "";
+
+        // Seletores de Elementos da UI
+        const resultCard = document.getElementById('resultCard');
+        const loading = document.getElementById('loading');
+        const summaryResult = document.getElementById('summaryResult');
+        const errorResult = document.getElementById('errorResult');
+        const metaInfo = document.getElementById('metaInfo');
+        const accordionTranscript = document.getElementById('accordionTranscript');
+        const transcriptResult = document.getElementById('transcriptResult');
+        const btnCopiar = document.getElementById('btnCopiar');
+
+        function prepareUIForLoading(btn, loadingText = 'Processando...') {
+            btn.disabled = true;
+            btn.innerHTML = loadingText;
+            resultCard.style.display = 'block';
+            loading.style.display = 'flex';
+            summaryResult.style.display = 'none';
+            errorResult.style.display = 'none';
+            metaInfo.style.display = 'none';
+            accordionTranscript.style.display = 'none';
+            btnCopiar.innerHTML = 'Copiar Texto';
+            currentRawSummary = "";
+        }
+
+        function displayResults(data, urlInput = null) {
+            loading.style.display = 'none';
+            summaryResult.style.display = 'block';
+
+            let textoResumo = data.summary || data.resumo || data.texto || data.text || JSON.stringify(data, null, 2);
+
+            // Corrige alucinações de formatação da IA
+            textoResumo = textoResumo.replace(/\[([^\]]+)\]\(javascript:;?\)\{onclick="window\.open\('([^']+)',\s*'[^']+'\)"\}/g, "[$1]($2)");
+            if (urlInput) {
+                const videoIdMatch = urlInput.match(/(?:youtu\.be\/|watch\?v=|\/(?:v|embed)\/)([0-9A-Za-z_-]{11})/);
+                if (videoIdMatch && videoIdMatch[1]) {
+                    textoResumo = textoResumo.replace(/VIDEO_ID_AQUI|VIDEO_ID|\[URL_DO_VÍDEO\]/gi, videoIdMatch[1]);
+                }
+            }
+
+            currentRawSummary = textoResumo;
+            summaryResult.innerHTML = marked.parse(textoResumo);
+            summaryResult.querySelectorAll('a').forEach(link => {
+                link.setAttribute('target', '_blank');
+                link.setAttribute('rel', 'noopener noreferrer');
+            });
+
+            // Preenche metadados
+            if (data.tokens_used) {
+                metaInfo.style.display = 'block';
+                document.getElementById('metaTokens').textContent = `🪙 Tokens: ${data.tokens_used}`;
+                const custoEstimado = (data.tokens_used / 1000000) * 0.50;
+                document.getElementById('metaCost').textContent = `💸 Custo: US$ ${custoEstimado.toFixed(5)}`;
+                const dateObj = data.created_at ? new Date(data.created_at) : new Date();
+                document.getElementById('metaDate').textContent = `📅 ${dateObj.toLocaleString('pt-BR')}`;
+            }
+            const metaProvider = document.getElementById('metaProvider');
+            if (data.provider) {
+                metaProvider.style.display = 'inline-block';
+                metaProvider.textContent = `🤖 ${data.provider}`;
+            } else {
+                metaProvider.style.display = 'none';
+            }
+
+            // Exibe transcrição (apenas para vídeos)
+            if (data.transcript) {
+                accordionTranscript.style.display = 'block';
+                transcriptResult.textContent = data.transcript;
+            }
+        }
+
+        function displayError(error) {
+            loading.style.display = 'none';
+            errorResult.style.display = 'block';
+            errorResult.textContent = '❌ Falha ao gerar resumo: ' + error.message;
+        }
+
+        // Listener para o formulário do YouTube
+        document.getElementById('resumoForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const urlInput = document.getElementById('videoUrl').value.trim();
+            if (!urlInput) return;
+
+            const btn = document.getElementById('btnResumir');
+            prepareUIForLoading(btn);
+
+            fetch('/resumo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ video_url: urlInput })
+            })
+                .then(response => response.ok ? response.json() : response.json().then(err => { throw new Error(err.error || 'Erro no servidor') }))
+                .then(data => displayResults(data, urlInput))
+                .catch(error => displayError(error))
+                .finally(() => { btn.disabled = false; btn.innerHTML = 'Resumir'; });
+        });
+
+        // Listener para o novo formulário de texto manual
+        document.getElementById('textoManualForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const title = document.getElementById('manualTitle').value.trim();
+            const text = document.getElementById('manualText').value.trim();
+            if (!title || !text) return;
+
+            const btn = document.getElementById('btnResumirTexto');
+            prepareUIForLoading(btn, 'Resumindo...');
+
+            fetch('/api/summarize-text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: title, text: text })
+            })
+                .then(response => response.ok ? response.json() : response.json().then(err => { throw new Error(err.error || 'Erro no servidor') }))
+                .then(data => displayResults(data))
+                .catch(error => displayError(error))
+                .finally(() => { btn.disabled = false; btn.innerHTML = 'Resumir Conteúdo Local'; });
+        });
+
+        // Listener para o formulário da Fila
+        document.getElementById('filaForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const urlInput = document.getElementById('filaVideoUrl').value.trim();
+            if (!urlInput) return;
+
+            const btn = document.getElementById('btnFilaSubmit');
+            const feedback = document.getElementById('filaFeedback');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adicionando...';
+            feedback.style.display = 'none';
+
+            // Cria um AbortController com timeout de 10 segundos
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+            fetch('/add_to_queue_web', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ video_url: urlInput }),
+                signal: controller.signal
+            })
+                .then(response => {
+                    clearTimeout(timeoutId);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    feedback.style.display = 'block';
+                    if (data.status === 'success') {
+                        feedback.className = 'alert alert-success';
+                        feedback.innerHTML = '✅ ' + data.message;
+                        document.getElementById('filaVideoUrl').value = '';
+                        atualizarFila();
+                        setTimeout(() => feedback.style.display = 'none', 3000);
+                    } else {
+                        feedback.className = 'alert alert-warning';
+                        feedback.innerHTML = '⚠️ ' + data.message;
+                        setTimeout(() => feedback.style.display = 'none', 3000);
+                    }
+                })
+                .catch(error => {
+                    clearTimeout(timeoutId);
+                    feedback.style.display = 'block';
+                    feedback.className = 'alert alert-danger';
+                    
+                    if (error.name === 'AbortError') {
+                        feedback.innerHTML = '❌ Timeout: Servidor demorando muito. Tente novamente.';
+                    } else {
+                        feedback.innerHTML = '❌ Erro: ' + error.message;
+                    }
+                    console.error('Erro ao adicionar fila:', error);
+                })
+                .finally(() => { btn.disabled = false; btn.innerHTML = '<i class="fas fa-plus"></i> Pôr na Fila'; });
+        });
+
+        // Lógica do Botão Copiar
+        document.getElementById('btnCopiar').addEventListener('click', function () {
+            if (!currentRawSummary) return;
+            const btn = this;
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(currentRawSummary).then(() => showCopySuccess(btn)).catch(() => fallbackCopy(currentRawSummary, btn));
+            } else {
+                fallbackCopy(currentRawSummary, btn);
+            }
+        });
+
+        function showCopySuccess(btn) {
+            btn.innerHTML = '✅ Copiado!';
+            setTimeout(() => btn.innerHTML = 'Copiar Texto', 3000);
+        }
+
+        function fallbackCopy(text, btn) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try { document.execCommand('copy'); showCopySuccess(btn); } catch (err) { console.error('Erro no fallback de cópia', err); }
+            document.body.removeChild(textArea);
+        }
+
+        // --- LÓGICA DA FILA DE PROCESSAMENTO ---
+        function acaoFila(acao, id) {
+            fetch(`/fila/action`, { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: acao, queue_item_id: id })
+            })
+                .then(response => response.json())
+                .then(data => { if (data.status === 'success') atualizarFila(); })
+                .catch(error => console.error('Erro na ação:', error));
+        }
+
+        function atualizarFila() {
+            fetch('/fila/status?_=' + new Date().getTime())
+                .then(response => response.json())
+                .then(data => {
+                    if (data.pendentes === undefined) return;
+
+                    const contador = document.getElementById('fila-contador');
+                    const textoFila = document.getElementById('fila-texto');
+                    const tabelaContainer = document.getElementById('tabela-fila-container');
+                    const corpoTabela = document.getElementById('corpo-tabela-fila');
+
+                    contador.innerText = data.pendentes;
+
+                    if (data.lista && data.lista.length > 0) {
+                        contador.className = 'badge bg-warning text-dark fs-4';
+                        textoFila.innerHTML = `O sistema está processando a fila em segundo plano.`;
+                        tabelaContainer.style.display = 'block';
+
+                        corpoTabela.innerHTML = '';
+                        data.lista.forEach(item => {
+                            let statusHtml = item.status === 'paused'
+                                ? '<span class="text-warning small align-middle">⏸️ Pausado</span>'
+                                : (item.posicao === 1 ? '<span class="fw-bold align-middle" style="color: #39FF14;">🔵 Processando...</span>' : '<span class="text-secondary small align-middle">⏳ Aguardando</span>');
+
+                            const btnPause = item.status === 'paused'
+                            ? `<button onclick="acaoFila('resume', ${item.id})" class="btn btn-sm btn-outline-success" title="Retomar Processamento">▶️</button>`
+                                : `<button onclick="acaoFila('pause', ${item.id})" class="btn btn-sm btn-outline-warning" title="Pausar Vídeo">⏸️</button>`;
+
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td><span class="badge ${item.posicao === 1 && item.status !== 'paused' ? 'bg-success' : 'bg-secondary'} px-2 py-1">${item.posicao}º</span></td>
+                                <td class="text-start text-truncate" style="max-width: 300px;"><a href="${item.video_url}" target="_blank" class="text-info text-decoration-none">${item.video_url}</a></td>
+                                <td>${statusHtml}</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button onclick="acaoFila('top', ${item.id})" class="btn btn-sm btn-outline-info" title="Jogar para o Topo">⬆️</button>
+                                        ${btnPause}
+                                        <button onclick="acaoFila('remove', ${item.id})" class="btn btn-sm btn-outline-danger" title="Excluir da Fila">🗑️</button>
+                                    </div>
+                                </td>`;
+                            corpoTabela.appendChild(tr);
+                        });
+                    } else {
+                        contador.className = 'badge bg-success fs-4';
+                        textoFila.innerHTML = `A fila está vazia. Todos os vídeos foram processados!`;
+                        tabelaContainer.style.display = 'none';
+                    }
+                })
+                .catch(error => console.error('Erro ao buscar status:', error));
+        }
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            atualizarFila();
+            setInterval(atualizarFila, 5000);
+        });
+    </script>
+</body>
+</html>

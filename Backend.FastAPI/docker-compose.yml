@@ -1,0 +1,60 @@
+name: backend_fastapi
+services:
+    main_app:
+        build:
+            context: /DATA/AppData/robot-feed/Backend.FastAPI
+            dockerfile: Dockerfile
+        cpu_shares: 90
+        command: []
+        container_name: backend-fastapi
+        deploy:
+            resources:
+                limits:
+                    memory: "8136949760"
+        environment:
+            DEEPSEEK_API_KEY: COLOQUE_SUA_CHAVE_AQUI
+            GEMINI_API_KEY: COLOQUE_SUA_CHAVE_AQUI
+            GROQ_API_KEY: COLOQUE_SUA_CHAVE_AQUI
+            MISTRAL_API_KEY: COLOQUE_SUA_CHAVE_AQUI
+            OLLAMA_HOST_IP: 192.168.0.10
+            OLLAMA_MODEL: google/gemma-3-12b
+            OLLAMA_MODEL_OLD2: qwen2.5-14b-instruct-1m
+            OLLAMA_MODEL_old: qwen3-14b-claude-sonnet-4.5-reasoning-distill
+        hostname: backend-fastapi
+        image: robot-feed-backend:prd
+        labels:
+            icon: https://icon.casaos.io/main/all/backend-fastapi.png
+        networks:
+            default: null
+        ports:
+            - mode: ingress
+              target: 8000
+              published: "8000"
+              protocol: tcp
+        restart: unless-stopped
+        volumes:
+            - type: bind
+              source: /DATA/AppData/robot-feed/Backend.FastAPI
+              target: /app
+              bind:
+                create_host_path: true
+            - type: bind
+              source: /etc/localtime
+              target: /etc/localtime
+              read_only: true
+              bind:
+                create_host_path: true
+networks:
+    default:
+        name: backend_fastapi_default
+x-casaos:
+    author: self
+    category: self
+    hostname: ""
+    icon: https://icon.casaos.io/main/all/backend-fastapi.png
+    index: /
+    is_uncontrolled: false
+    port_map: "8000"
+    scheme: http
+    title:
+        custom: Backend Das Minhas Aplicações

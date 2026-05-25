@@ -1,0 +1,251 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #f7f7f7;
+    color: #222;
+    transition: background 0.3s, color 0.3s;
+}
+.container {
+    width: 80%;
+    margin: 40px auto;
+    max-width: 1600px; /* Evita que fique largo demais em telas muito grandes */
+    background: #fff;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px #ccc;
+    transition: background 0.3s;
+}
+h1 { text-align: center; }
+form { margin-bottom: 24px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+label { font-weight: bold; }
+input, select {
+    padding: 6px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background: #fff;
+    color: #222;
+    transition: background 0.3s, color 0.3s;
+}
+table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+    transition: background 0.3s, color 0.3s;
+}
+th { background: #eee; }
+.lote-img {
+    max-width: 250px;
+    max-height: 250px;
+    border-radius: 6px;
+    background: #eee;
+    object-fit: cover;
+    cursor: pointer;
+    vertical-align: middle;
+}
+tr:nth-child(even) { background: #f9f9f9; }
+
+/* Modo noturno */
+body.night { /* Apenas o body precisa da classe */
+    background: #181a20;
+    color: #e0e0e0;
+}
+body.night .container {
+    background: #23262f;
+    box-shadow: 0 2px 8px #111;
+}
+body.night input, body.night select {
+    background: #23262f;
+    color: #e0e0e0;
+    border: 1px solid #444;
+}
+body.night th, body.night td {
+    background: #23262f;
+    color: #e0e0e0;
+    border: 1px solid #444;
+}
+body.night th { background: #2c2f3a; }
+body.night tr:nth-child(even) { background: #20222b; }
+
+/* Adicione este CSS dentro da tag <style> */
+#summary-stats table {
+    width: auto; /* A tabela não ocupará 100% da largura */
+    margin-top: 10px;
+}
+#summary-stats th, #summary-stats td {
+    padding: 6px 12px;
+}
+body.night #summary-stats p strong {
+    color: #a9a9a9;
+}
+
+
+/* Adicione este CSS dentro da sua tag <style> */
+
+.accordion-header {
+    cursor: pointer;
+    user-select: none; /* Impede que o texto seja selecionado ao clicar */
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #f1f1f1;
+    transition: background-color 0.3s;
+}
+
+.accordion-header:hover {
+    background-color: #e1e1e1;
+}
+
+.accordion-panel {
+    max-height: 0; /* Começa fechado */
+    overflow: hidden;
+    transition: max-height 0.4s ease-out; /* Efeito de deslizar */
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+}
+
+/* Estilos para o modo noturno do acordeão */
+body.night .accordion-header {
+    background-color: #2c2f3a;
+    border-color: #444;
+}
+
+body.night .accordion-header:hover {
+    background-color: #353945;
+}
+
+body.night .accordion-panel {
+    border-color: #444;
+}
+
+/* Estilo para a célula de carregamento */
+.loading-cell {
+    text-align: center;
+    font-style: italic;
+    color: #888;
+    padding: 40px;
+}
+
+/* --- Estilos do Modal de Foto --- */
+.foto-modal-container {
+    display: none; /* Começa escondido */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.92);
+    z-index: 9999;
+    overflow: auto; /* Permite rolagem quando a imagem está com zoom */
+    cursor: pointer; /* Cursor de fechar para o fundo */
+}
+
+.foto-modal-container img {
+    /* Estado inicial (ajustado à tela) */
+    box-shadow: 0 2px 24px #000;
+    border-radius: 12px;
+    display: block;
+    margin: auto;
+    /* Transição suave para todas as propriedades alteradas */
+    transition: all 0.2s ease-in-out;
+}
+
+/* Nível 0: Ajustado à tela (Padrão) */
+.foto-modal-container img[data-zoom-level="0"] {
+    /* A centralização no estado inicial é feita pelo 'margin: auto' herdado. */
+    max-width: 95vw;
+    max-height: 95vh;
+    width: auto; /* Garante que a proporção seja mantida */
+    cursor: zoom-in;
+}
+
+/* Para todos os níveis de zoom (exceto o 0), removemos a margem automática.
+   Isso alinha a imagem no canto superior esquerdo do modal, permitindo
+   que as barras de rolagem funcionem corretamente. */
+.foto-modal-container img[data-zoom-level]:not([data-zoom-level="0"]) {
+    margin: 0;
+}
+
+/* Nível 1: 100% (Tamanho natural) */
+.foto-modal-container img[data-zoom-level="1"] {
+    max-width: none;
+    max-height: none;
+    width: auto;
+    cursor: zoom-in;
+}
+
+/* Nível 2: Zoom de 150% */
+.foto-modal-container img[data-zoom-level="2"] {
+    width: 150vw;
+    max-width: none;
+    max-height: none;
+    cursor: zoom-in;
+}
+
+/* Nível 3: Zoom de 250% (Último nível) */
+.foto-modal-container img[data-zoom-level="3"] {
+    width: 250vw;
+    max-width: none;
+    max-height: none;
+    cursor: zoom-out; /* Indica que voltará ao início */
+}
+
+.btn-danger {
+    background-color: #d9534f;
+    color: white;
+    border-color: #d43f3a;
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-weight: bold;
+}
+.btn-danger:hover {
+    background-color: #c9302c;
+    border-color: #ac2925;
+}
+/* Melhoria nos Cards do Cofre */
+.accordion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    font-size: 1.1rem;
+    line-height: 1.4;
+}
+
+/* Container do Resumo */
+.resumo-box {
+    position: relative;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    margin-top: 15px;
+}
+
+/* Botão Copiar Flutuante */
+.btn-copy-float {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    opacity: 0.7;
+    transition: opacity 0.3s;
+}
+.btn-copy-float:hover { opacity: 1; }
+
+/* Ajustes para Celular (S21 FE) */
+@media (max-width: 768px) {
+    .accordion-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .accordion-header span {
+        float: none !important;
+        margin-top: 10px;
+        width: 100%;
+        justify-content: space-between;
+    }
+    .container { width: 95%; padding: 10px; }
+}

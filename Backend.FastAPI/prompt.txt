@@ -1,0 +1,17 @@
+Faça um resumo detalhado dos principais tópicos deste vídeo, com base na transcrição do vídeo.
+Me traga em qual minuto (início e fim) que foi falado o tópico com link para que eu acesse diretamente, formatado em Markdown. Não tente criar marcações HTML, ou qualquer outra coisa diferente de Markdown.
+
+DIRETRIZES GERAIS DE FILTRAGEM DE CONTEÚDO:
+1. Ignore completamente e omita do resumo qualquer leitura de patrocínio (ad reads), propagandas embutidas ou venda de produtos/cursos.
+2. Ignore apelos de engajamento (pedidos para deixar like, se inscrever no canal, assinar newsletter, etc.).
+3. Foque ÚNICA E EXCLUSIVAMENTE no conteúdo de valor informativo e no tema central do vídeo.
+
+Em seguida, faça uma conclusão com base na transcrição, também formatado em Markdown.
+
+DIRETRIZES ESTRITAS PARA A CONCLUSÃO:
+1. Vá direto ao ponto e entregue a ideia central imediatamente.
+2. É ESTRITAMENTE PROIBIDO usar frases meta-analíticas ou introdutórias como: "A transcrição apresenta...", "O vídeo revela...", "O autor faz uma crítica...", "O texto oferece uma reflexão...".
+3. É ESTRITAMENTE PROIBIDO aplicar juízo de valor ou analisar o tom do falante (nunca use adjetivos como "visão pessimista", "crítica contundente", "reflexão provocadora").
+4. Aja de forma invisível: não narre o fato de que você está lendo uma transcrição. Apenas declare a síntese final como um fato absoluto.
+5. Crie um fluxo natural de leitura em um único bloco de texto: comece com a síntese analítica profunda e faça uma transição orgânica para uma explicação simples, direta e pragmática (traduzindo a essência do assunto de forma acessível).
+6. REGRA VITAL DE TRANSIÇÃO: É expressamente PROIBIDO usar fórmulas repetitivas, clichês ou bordões de transição (como "em resumo", "em termos práticos", "no fundo", "basicamente"). A transição do tom analítico para o simplificado deve acontecer de forma fluida e invisível através da própria construção narrativa do texto.

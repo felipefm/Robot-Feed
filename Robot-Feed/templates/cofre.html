@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cofre de Conhecimento</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('style') }}">
+    <style>
+        /* Estilo Terminal Retrô */
+        .modal-terminal .modal-content {
+            background-color: #0c0c0c;
+            border: 1px solid #333;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+        }
+        .modal-terminal .modal-header { border-bottom: 1px solid #333; }
+        .modal-terminal .modal-title { color: #00ff00; font-family: 'Courier New', monospace; }
+        .modal-terminal .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+        .terminal-body {
+            background-color: #000;
+            color: #00ff00;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            max-height: 60vh;
+            overflow-y: auto;
+            padding: 15px;
+            white-space: pre-wrap; /* Mantém quebras de linha */
+        }
+        /* Scrollbar customizada para o terminal */
+        .terminal-body::-webkit-scrollbar { width: 8px; }
+        .terminal-body::-webkit-scrollbar-track { background: #000; }
+        .terminal-body::-webkit-scrollbar-thumb { background: #004400; }
+    </style>
+</head>
+<body class="night"> <!-- Tema noturno padrão conforme sua preferência -->
+    
+    {% include 'navbar.html' %}
+
+    <div class="container position-relative">
+        <!-- Botão de Logs -->
+        <button type="button" class="btn btn-outline-success btn-sm position-absolute top-0 end-0 mt-4 me-4" onclick="openLogModal()">📟 Logs</button>
+        
+        <h1>Cofre de Conhecimento</h1>
+        <p style="text-align: center; color: #888;">Seu arquivo pessoal de resumos e conhecimentos valiosos extraídos dos vídeos.</p>
+
+        <!-- Formulário de Busca -->
+        <form method="GET" action="{{ url_for('resumo.cofre_index') }}" style="margin-top: 30px;">
+            <input type="text" name="q" placeholder="Buscar palavra-chave no título ou resumo..." value="{{ search_query }}" style="width: 100%; max-width: 500px;">
+            <button type="submit" style="padding: 7px 15px; cursor: pointer; border-radius: 4px; border: 1px solid #444; background: #333; color: white;">Buscar no Arquivo</button>
+            {% if search_query %}
+                <a href="{{ url_for('resumo.cofre_index') }}" style="margin-left: 10px; color: #d9534f; text-decoration: none; font-size: 0.9em;">Limpar Filtro</a>
+            {% endif %}
+        </form>
+
+        <hr style="border: 0; border-top: 1px solid #444; margin: 20px 0;">
+
+        <!-- Lista de Vídeos Arquivados -->
+        {% if videos %}
+            <p style="text-align: right; font-size: 0.9em; color: #888;">{{ total_records }} registro(s) arquivado(s).</p>
+            
+            {% for video in videos %}
+                <div style="margin-bottom: 15px;">
+                    <!-- Cabeçalho Acordeão -->
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <strong>{{ video.title }}</strong>
+                        <span style="float: right; font-size: 0.85em; color: #aaa; display: flex; align-items: center; gap: 8px;">
+                            {{ video.channel_name }} | Salvo em: {{ video.archived_at.strftime('%d/%m/%Y') }}
+                            {% if video.provider %}
+                                <span class="badge bg-secondary text-light" style="font-size: 0.8em; border: 1px solid #555;">🤖 {{ video.provider }}</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    <!-- Painel Oculto com o Conteúdo -->
+                    <div class="accordion-panel">
+                        <div style="padding: 15px;">
+                            <div class="d-flex justify-content-between align-items-start" style="margin-top: 0;">
+                                <p style="margin: 0;">
+                                    <strong>Data de Publicação Original:</strong> {{ video.published_at or 'Desconhecida' }} <br>
+                                    <strong>Link Original:</strong> <a href="https://youtube.com/watch?v={{ video.video_id }}" target="_blank" style="color: #4CAF50; text-decoration: none;">Assistir Vídeo no YouTube</a>
+                                </p>
+                                <form action="{{ url_for('resumo.delete_cofre', video_id=video.video_id) }}" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja apagar este resumo do cofre?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Deletar Resumo">
+                                        🗑️ Deletar
+                                    </button>
+                                </form>
+                            </div>
+                            
+                            <div style="margin-top: 15px;">
+                                <strong>Resumo Extraído:</strong>
+                                <div class="resumo-box">
+                                    <button class="btn btn-sm btn-outline-light btn-copy-float"
+                                            onclick='copyToClipboard(this, {{ video.summary | tojson }})'>
+                                        📋 Copiar
+                                    </button>
+                                    
+                                    <div id="resumo-{{ video.video_id }}" class="resumo-content" data-raw="{{ video.summary }}" style="line-height: 1.6; color: #e0e0e0;">
+                                        {{ video.summary }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+
+            <!-- Paginação -->
+            {% if total_pages > 1 %}
+            <nav aria-label="Navegação do Cofre" class="mt-4">
+                <ul class="pagination justify-content-center flex-wrap">
+                    <!-- Botão Anterior -->
+                    <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                        <a class="page-link bg-dark border-secondary text-light" href="?page={{ page - 1 }}{% if search_query %}&q={{ search_query }}{% endif %}" tabindex="-1" {% if page == 1 %}aria-disabled="true"{% endif %}>Anterior</a>
+                    </li>
+                    
+                    <!-- Números das Páginas (Oculto em telas muito pequenas) -->
+                    {% for p in range(1, total_pages + 1) %}
+                        {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+                            <li class="page-item {% if p == page %}active{% endif %} d-none d-sm-block">
+                                <a class="page-link {% if p == page %}bg-primary border-primary text-white{% else %}bg-dark border-secondary text-light{% endif %}" href="?page={{ p }}{% if search_query %}&q={{ search_query }}{% endif %}">{{ p }}</a>
+                            </li>
+                        {% elif p == page - 3 or p == page + 3 %}
+                            <li class="page-item disabled d-none d-sm-block">
+                                <span class="page-link bg-dark border-secondary text-muted">...</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    <!-- Status simplificado para Mobile -->
+                    <li class="page-item disabled d-block d-sm-none">
+                        <span class="page-link bg-dark border-secondary text-muted">{{ page }} / {{ total_pages }}</span>
+                    </li>
+                    
+                    <!-- Botão Próximo -->
+                    <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                        <a class="page-link bg-dark border-secondary text-light" href="?page={{ page + 1 }}{% if search_query %}&q={{ search_query }}{% endif %}" {% if page == total_pages %}aria-disabled="true"{% endif %}>Próximo</a>
+                    </li>
+                </ul>
+                <div class="text-center text-muted small mt-2">
+                    Página {{ page }} de {{ total_pages }} | Exibindo {{ videos|length }} registro(s) nesta página (Total: {{ total_records }})
+                </div>
+            </nav>
+            {% endif %}
+        {% else %}
+            <div style="text-align: center; padding: 40px; color: #888;">
+                <p>Nenhum vídeo foi encontrado no seu cofre.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Modal Terminal de Logs -->
+    <div class="modal fade modal-terminal" id="logModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">_SYSTEM_LOGS.exe</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="terminalContent" class="terminal-body">
+                        Carregando dados do sistema...
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <div class="form-check form-switch me-auto">
+                        <input class="form-check-input" type="checkbox" id="chkFullLogs" onchange="loadLogs()">
+                        <label class="form-check-label text-muted small" for="chkFullLogs">Modo Detalhado (Debug)</label>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="loadLogs()">🔄 Atualizar</button>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Controle do tema via localStorage caso você altere entre claro/escuro globalmente
+        if(localStorage.getItem('theme') === 'light') {
+            document.body.classList.remove('night');
+        }
+
+        // Inicializa Modal e Lógica de Logs
+        let logModal;
+        document.addEventListener("DOMContentLoaded", function() {
+            logModal = new bootstrap.Modal(document.getElementById('logModal'));
+        });
+
+        function openLogModal() {
+            logModal.show();
+            loadLogs();
+        }
+
+        function loadLogs() {
+            const terminal = document.getElementById('terminalContent');
+            terminal.innerHTML = 'Conectando ao mainframe...<br>';
+            const fullMode = document.getElementById('chkFullLogs').checked;
+            
+            fetch('/logs?full=' + fullMode)
+                .then(response => response.json())
+                .then(data => { terminal.innerHTML = data.join(''); terminal.scrollTop = terminal.scrollHeight; })
+                .catch(err => { terminal.innerHTML += '<span style="color:red">ERRO DE CONEXÃO: ' + err + '</span>'; });
+        }
+        // 1. Função para Copiar (Corrigida para lidar com aspas e quebras)
+        function copyToClipboard(btn, text) {
+            // Limpa as marcas de bloco de código da IA antes de copiar
+            const cleanText = text.replace(/```markdown/g, '').replace(/```/g, '').trim();
+            
+            // Fallback para garantir funcionamento em HTTP (CasaOS)
+            const textArea = document.createElement("textarea");
+            textArea.value = cleanText;
+            document.body.appendChild(textArea);
+            textArea.select();
+            
+            try {
+                document.execCommand('copy');
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = "✅ Copiado!";
+                btn.classList.replace('btn-outline-light', 'btn-success');
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.classList.replace('btn-success', 'btn-outline-light');
+                }, 2000);
+            } catch (err) {
+                console.error('Erro ao copiar', err);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        // 2. Acordeão com Renderização de Markdown
+        function toggleAccordion(element) {
+            const panel = element.nextElementSibling;
+            const contentDiv = panel.querySelector('.resumo-content');
+            
+            // Se o painel for abrir, processamos o Markdown
+            if (!panel.style.maxHeight || panel.style.maxHeight === '0px') {
+                // Pega o texto bruto (que pode ter as crases ```)
+                let rawText = contentDiv.getAttribute('data-raw') || contentDiv.innerText;
+                
+                // Salva o bruto para não perder nas re-aberturas
+                if(!contentDiv.getAttribute('data-raw')) {
+                    contentDiv.setAttribute('data-raw', rawText);
+                }
+
+                // Limpa e Transforma em HTML bonito
+                let cleanText = rawText.replace(/```markdown/g, '').replace(/```/g, '').trim();
+                contentDiv.innerHTML = marked.parse(cleanText); 
+                
+                // Garante que os links abram em nova aba
+                contentDiv.querySelectorAll('a').forEach(link => link.target = '_blank');
+
+                panel.style.maxHeight = "none";
+            } else {
+                panel.style.maxHeight = '0px';
+            }
+        }
+    </script>
+</body>
+</html>

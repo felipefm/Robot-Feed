@@ -1,0 +1,660 @@
+<!-- k:\0-Desenvolvimento\dev\Robot Feed\templates\leiloes.html -->
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garimpo de Leilões</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Carrega CSS customizado legado para a tabela e modal -->
+    <link rel="stylesheet" href="{{ url_for('style') }}">
+    <style>
+        body { background-color: #f8f9fa; }
+        .card { box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: none; margin-bottom: 20px; }
+        .card-header { font-weight: bold; }
+        /* Ajustes para compatibilidade com o script.js antigo */
+        .lote-img { cursor: pointer; transition: transform 0.2s; }
+        .lote-img:hover { transform: scale(1.05); }
+        #resultados th { cursor: pointer; }
+        /* Esconde botão night mode antigo pois já temos o bootstrap */
+        #toggle-night { display: none; }
+        /* Estilo para cabeçalho de coluna ordenada */
+        #resultados th.sort-active { background-color: #ddeeff; }
+        
+        /* --- Estilos do Modal de Zoom --- */
+        .foto-modal-container {
+            background: rgba(0, 0, 0, 0.9) !important;
+            cursor: zoom-out;
+            overflow: auto; /* Permite rolar se a imagem for muito grande */
+        }
+        .foto-modal-container img {
+            transition: transform 0.2s ease, width 0.2s ease;
+            margin: auto;
+            display: block;
+            cursor: zoom-in;
+        }
+        /* Nível 0: Ajustado à tela (Padrão) */
+        .foto-modal-container img[data-zoom-level="0"] {
+            max-width: 90vw;
+            max-height: 90vh;
+            width: auto;
+        }
+        /* Nível 1: Tamanho Real */
+        .foto-modal-container img[data-zoom-level="1"] {
+            max-width: none; max-height: none; width: auto;
+        }
+        /* Nível 2: Zoom 150% */
+        .foto-modal-container img[data-zoom-level="2"] {
+            max-width: none; max-height: none; width: 150vw;
+        }
+        /* Nível 3: Zoom 200% */
+        .foto-modal-container img[data-zoom-level="3"] {
+            max-width: none; max-height: none; width: 200vw;
+        }
+
+        /* Estilo Terminal Retrô (Copiado do Monitor) */
+        .modal-terminal .modal-content {
+            background-color: #0c0c0c;
+            border: 1px solid #333;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+        }
+        .modal-terminal .modal-header { border-bottom: 1px solid #333; }
+        .modal-terminal .modal-title { color: #00ff00; font-family: 'Courier New', monospace; }
+        .modal-terminal .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+        .terminal-body {
+            background-color: #000;
+            color: #00ff00;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            max-height: 60vh;
+            overflow-y: auto;
+            padding: 15px;
+            white-space: pre-wrap; /* Mantém quebras de linha */
+        }
+        /* Scrollbar customizada para o terminal */
+        .terminal-body::-webkit-scrollbar { width: 8px; }
+        .terminal-body::-webkit-scrollbar-track { background: #000; }
+        .terminal-body::-webkit-scrollbar-thumb { background: #004400; }
+    </style>
+</head>
+<body>
+    {% include 'navbar.html' %}
+    
+    <div class="container mt-4">
+        <!-- Mensagens de Feedback -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="row">
+            <!-- Coluna Esquerda: Configurações e Filtros -->
+            <div class="col-md-3">
+                
+                <!-- Card de Configurações (Acordeão) -->
+                <div class="card">
+                    <div class="card-header bg-secondary text-white" role="button" data-bs-toggle="collapse" data-bs-target="#configLeilao" aria-expanded="false">
+                        ⚙️ Configurações <span class="float-end">▼</span>
+                    </div>
+                    <div class="collapse" id="configLeilao">
+                        <div class="card-body">
+                            <form action="/update_auction_config" method="POST">
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Agendamento da Varredura</label>
+                                    <div class="d-flex flex-wrap gap-2 mb-2">
+                                        {% set days = config.auction_schedule_days.split(',') if config.auction_schedule_days else [] %}
+                                        <div class="form-check form-check-inline m-0"><input class="form-check-input" type="checkbox" name="days" value="0" {% if '0' in days %}checked{% endif %}><label class="form-check-label small">Seg</label></div>
+                                        <div class="form-check form-check-inline m-0"><input class="form-check-input" type="checkbox" name="days" value="1" {% if '1' in days %}checked{% endif %}><label class="form-check-label small">Ter</label></div>
+                                        <div class="form-check form-check-inline m-0"><input class="form-check-input" type="checkbox" name="days" value="2" {% if '2' in days %}checked{% endif %}><label class="form-check-label small">Qua</label></div>
+                                        <div class="form-check form-check-inline m-0"><input class="form-check-input" type="checkbox" name="days" value="3" {% if '3' in days %}checked{% endif %}><label class="form-check-label small">Qui</label></div>
+                                        <div class="form-check form-check-inline m-0"><input class="form-check-input" type="checkbox" name="days" value="4" {% if '4' in days %}checked{% endif %}><label class="form-check-label small">Sex</label></div>
+                                        <div class="form-check form-check-inline m-0"><input class="form-check-input" type="checkbox" name="days" value="5" {% if '5' in days %}checked{% endif %}><label class="form-check-label small">Sab</label></div>
+                                        <div class="form-check form-check-inline m-0"><input class="form-check-input" type="checkbox" name="days" value="6" {% if '6' in days %}checked{% endif %}><label class="form-check-label small">Dom</label></div>
+                                    </div>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">Horário</span>
+                                        <input type="time" name="time" class="form-control" value="{{ config.auction_schedule_time }}" required>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small">URL Backend Leilão</label>
+                                    <input type="text" name="api_url" class="form-control form-control-sm" value="{{ config.auction_api_url }}" placeholder="http://192.168.0.6:8000">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm w-100">Salvar</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card de Ações Rápidas -->
+                <div class="card">
+                    <div class="card-header bg-warning text-dark">
+                        ⚡ Ações
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Rastrear Novo Termo</label>
+                            <div class="input-group">
+                                <input type="text" id="search-term" class="form-control form-control-sm" placeholder="Ex: Relógio">
+                                <button class="btn btn-dark btn-sm" id="btn-rastrear" type="button">🔍</button>
+                            </div>
+                            <div class="form-text x-small">Inicia varredura no backend.</div>
+                        </div>
+                        <hr>
+                        <button id="btn-view-logs" class="btn btn-info btn-sm w-100 mb-2">📜 Ver Logs</button>
+                        <button id="btn-force-check" class="btn btn-primary btn-sm w-100 mb-2">🚀 Verificar Tudo Agora</button>
+                        <div class="d-flex gap-1">
+                            <button id="delete-all-lotes-btn" class="btn btn-outline-secondary btn-sm w-50" title="Apaga apenas os resultados encontrados">🧹 Limpar</button>
+                            <button id="delete-all-terms-btn" class="btn btn-outline-danger btn-sm w-50" title="Apaga termos e resultados (Reset total)">🗑️ Reset</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Estatísticas Rápidas -->
+                <div class="card">
+                    <div class="card-header">📊 Resumo</div>
+                    <div class="card-body p-2 small" id="summary-stats">
+                        Carregando...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coluna Direita: Resultados -->
+            <div class="col-md-9">
+                <div class="card">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <span>🔨 Lotes Encontrados</span>
+                        
+                        <!-- Formulário de Filtros (Integrado ao script.js) -->
+                        <form id="filtros" class="d-flex gap-2 m-0">
+                            <select id="dominio-select" name="dominio" class="form-select form-select-sm" style="width: 150px;">
+                                <option value="">Todos Sites</option>
+                            </select>
+                            <input type="text" name="termo" class="form-control form-control-sm" placeholder="Filtrar título..." style="width: 150px;">
+                            <input type="number" name="lances_max" class="form-control form-control-sm" placeholder="Max Lances" style="width: 100px;">
+                            <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+                        </form>
+                    </div>
+                    
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover mb-0" id="resultados">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th width="120">Foto</th>
+                                        <th data-sort-col="titulo">Título <span class="sort-icon">⬍</span></th>
+                                        <th data-sort-col="termo">Termo <span class="sort-icon">⬍</span></th>
+                                        <th data-sort-col="valor">Valor <span class="sort-icon">⬍</span></th>
+                                        <th data-sort-col="lances">Lances <span class="sort-icon">⬍</span></th>
+                                        <th data-sort-col="data_leilao">Data <span class="sort-icon">⬍</span></th>
+                                        <th>Link</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Preenchido via JS -->
+                                    <tr><td colspan="9" class="text-center py-5">Carregando dados...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white">
+                        <div id="paginacao" class="d-flex justify-content-center gap-2 align-items-center">
+                            <!-- Paginação via JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Termos -->
+    <div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="termsModalLabel">Termos Únicos e Contagem</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>Termo</th>
+                        <th class="text-center">Itens</th>
+                        <th class="text-end">Ação</th>
+                    </tr>
+                </thead>
+                <tbody id="terms-modal-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Terminal de Logs (Estilo Retrô) -->
+    <div class="modal fade modal-terminal" id="logModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">_SYSTEM_LOGS.exe</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="terminalContent" class="terminal-body">Carregando dados do sistema...</div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <div class="form-check form-switch me-auto">
+                        <input class="form-check-input" type="checkbox" id="chkFullLogs">
+                        <label class="form-check-label text-muted small" for="chkFullLogs">Modo Detalhado (Debug)</label>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-success" id="btn-refresh-logs">🔄 Atualizar</button>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Foto (Mantido estrutura para o script.js) -->
+    <div id="foto-modal" class="foto-modal-container" style="display: none;">
+        <img id="foto-modal-img" src="" alt="Zoom">
+    </div>
+
+    <!-- Botão oculto para compatibilidade se o script procurar -->
+    <button id="toggle-night" style="display:none;"></button>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Script Inline para nova lógica de Histórico e Cache -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // --- Variáveis de Estado ---
+            let historyCache = [];
+            let currentFilteredData = [];
+            let sortColumn = null;
+            let sortDirection = 'asc';
+
+            // --- Seletores de DOM ---
+            const tableBody = document.querySelector('#resultados tbody');
+            const summaryStats = document.getElementById('summary-stats');
+            const dominioSelect = document.getElementById('dominio-select');
+            const photoModal = document.getElementById('foto-modal');
+            const photoModalImg = document.getElementById('foto-modal-img');
+            const filtrosForm = document.getElementById('filtros');
+            const btnRastrear = document.getElementById('btn-rastrear');
+
+             // Carrega dados iniciais
+            loadHistory();
+
+            // Função para carregar histórico
+            function loadHistory() {
+                tableBody.innerHTML = '<tr><td colspan="9" class="text-center py-5">Carregando histórico...</td></tr>';
+                
+                fetch('/api/history')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) throw new Error(data.error);
+                        historyCache = Array.isArray(data) ? data : [];
+                        currentFilteredData = [...historyCache]; // Inicia com todos os dados
+                        renderTable(currentFilteredData);
+                        updateStats(historyCache);
+                        populateDominios(historyCache);
+                    })
+                    .catch(error => {
+                        console.error('Erro:', error);
+                        tableBody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-5">Erro ao carregar: ${error.message}</td></tr>`;
+                    });
+            }
+
+            // --- Funções de Ordenação ---
+            function parseValue(valueStr) {
+                if (!valueStr || typeof valueStr !== 'string') return 0;
+                return parseFloat(valueStr.replace('R$', '').replace(/\./g, '').replace(',', '.').trim());
+            }
+
+            function sortData(data, column, direction) {
+                data.sort((a, b) => {
+                    const valA = a[column];
+                    const valB = b[column];
+                    let comparison = 0;
+
+                    if (column === 'valor') {
+                        comparison = parseValue(valA) - parseValue(valB);
+                    } else if (column === 'lances') {
+                        comparison = (valA || 0) - (valB || 0);
+                    } else {
+                        // Fallback para comparação de strings
+                        comparison = (valA || '').toString().localeCompare((valB || '').toString());
+                    }
+
+                    return direction === 'asc' ? comparison : -comparison;
+                });
+            }
+
+
+            // Renderiza Tabela
+            function renderTable(data) {
+                tableBody.innerHTML = '';
+                if (data.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="9" class="text-center py-5">Nenhum item encontrado.</td></tr>';
+                    return;
+                }
+
+                data.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><img src="${item.imagem || ''}" class="lote-img img-thumbnail" style="max-height: 100px;" onclick="openModal('${item.imagem}')"></td>
+                        <td><small>${item.titulo}</small></td>
+                        <td><span class="badge bg-secondary">${item.termo}</span></td>
+                        <td class="fw-bold text-success">${item.valor}</td>
+                        <td>${item.lances}</td>
+                        <td><small>${item.data_leilao}</small></td>
+                        <td><a href="${item.link}" target="_blank" class="btn btn-sm btn-outline-primary">Ver</a></td>
+                        <td><button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${item.id})">×</button></td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+
+            // Atualiza Estatísticas
+            function updateStats(data) {
+                const uniqueTerms = new Set(data.map(i => i.termo)).size;
+                const uniqueSites = new Set(data.map(i => i.site)).size;
+
+                // Calcula contagem por termo para o modal
+                const termCounts = data.reduce((acc, item) => {
+                    acc[item.termo] = (acc[item.termo] || 0) + 1;
+                    return acc;
+                }, {});
+
+                // Ordena termos por contagem (descendente)
+                const sortedTerms = Object.entries(termCounts).sort(([, a], [, b]) => b - a);
+
+                // Popula o corpo do modal
+                const termsModalBody = document.getElementById('terms-modal-body');
+                termsModalBody.innerHTML = sortedTerms.map(([term, count]) => `
+                    <tr>
+                        <td>${term}</td>
+                        <td class="text-center">${count}</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary py-0 px-2 btn-check-term" data-term="${term}" title="Verificar '${term}' agora">🚀</button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                 summaryStats.innerHTML = `
+                    <div><strong>Total Itens:</strong> ${data.length}</div>
+                    <div><strong>Termos Únicos:</strong> <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">${uniqueTerms}</a></div>
+                    <div><strong>Sites Rastreados:</strong> ${uniqueSites}</div>
+                `;
+            }
+
+            // Popula Select de Domínios
+            function populateDominios(data) {
+                const sites = [...new Set(data.map(i => i.site))].sort();
+                const currentVal = dominioSelect.value;
+                dominioSelect.innerHTML = '<option value="">Todos Sites</option>';
+                sites.forEach(site => {
+                    const option = document.createElement('option');
+                    option.value = site;
+                    option.textContent = site;
+                    dominioSelect.appendChild(option);
+                });
+                dominioSelect.value = currentVal;
+            }
+
+            // Função central para filtrar e ordenar
+            function applyFiltersAndSort() {
+                const formData = new FormData(document.getElementById('filtros'));
+                const termo = formData.get('termo').toLowerCase();
+                const dominio = formData.get('dominio');
+                const maxLances = formData.get('lances_max');
+
+                currentFilteredData = historyCache.filter(item => {
+                    const matchTermo = !termo || item.titulo.toLowerCase().includes(termo) || item.termo.toLowerCase().includes(termo);
+                    const matchDominio = !dominio || item.site === dominio;
+                    const matchLances = !maxLances || item.lances <= parseInt(maxLances);
+                    return matchTermo && matchDominio && matchLances;
+                });
+
+                if (sortColumn) {
+                    sortData(currentFilteredData, sortColumn, sortDirection);
+                }
+
+                renderTable(currentFilteredData);
+                updateSortHeaders();
+            }
+
+            // --- Event Listeners ---
+
+            // Filtros
+            filtrosForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                applyFiltersAndSort();
+            });
+
+            // Limpar filtros (se necessário no futuro)
+            filtrosForm.addEventListener('reset', function() {
+                setTimeout(() => applyFiltersAndSort(), 0);
+            });
+
+            // Ação: Verificar Termo Específico (dentro do Modal)
+            document.getElementById('terms-modal-body').addEventListener('click', function(e) {
+                const checkButton = e.target.closest('.btn-check-term');
+                if (checkButton) {
+                    const term = checkButton.dataset.term;
+                    if (term) {
+                        // Fecha o modal antes de iniciar a busca
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('termsModal'));
+                        if (modal) {
+                            modal.hide();
+                        }
+                        
+                        // Dispara a busca para o termo específico
+                        triggerSearch([term], checkButton);
+                    }
+                }
+            });
+
+            // Ação: Rastrear Novo Termo
+            btnRastrear.addEventListener('click', function() {
+                const input = document.getElementById('search-term').value.trim();
+                if (!input) return alert('Digite um ou mais termos!');
+
+                // Separa os termos por vírgula, remove espaços e filtra itens vazios
+                const termsList = input.split(',').map(t => t.trim()).filter(t => t);
+
+                if (termsList.length > 0) {
+                    triggerSearch(termsList, this);
+                }
+            });
+
+            // Função para carregar logs (Estilo Terminal)
+            function loadLogs() {
+                const terminal = document.getElementById('terminalContent');
+                terminal.innerHTML = 'Conectando ao mainframe...<br>';
+                const fullMode = document.getElementById('chkFullLogs').checked;
+                
+                fetch('/logs?full=' + fullMode)
+                    .then(res => res.json())
+                    .then(data => {
+                        terminal.innerHTML = Array.isArray(data) ? data.join('') : 'Erro ao carregar logs.';
+                        terminal.scrollTop = terminal.scrollHeight;
+                    })
+                    .catch(err => terminal.innerHTML += '<span style="color:red">ERRO DE CONEXÃO: ' + err + '</span>');
+            }
+
+            // Ação: Ver Logs
+            document.getElementById('btn-view-logs').addEventListener('click', function() {
+                const logModal = new bootstrap.Modal(document.getElementById('logModal'));
+                logModal.show();
+                loadLogs();
+            });
+            
+            // Controles internos do Modal de Logs
+            document.getElementById('btn-refresh-logs').addEventListener('click', loadLogs);
+            document.getElementById('chkFullLogs').addEventListener('change', loadLogs);
+
+            // Ação: Verificar Tudo Agora (Force Check)
+            document.getElementById('btn-force-check').addEventListener('click', function() {
+                const uniqueTerms = [...new Set(historyCache.map(i => i.termo))];
+                if (uniqueTerms.length === 0) return alert('Não há termos no histórico para verificar.');
+                
+                if(confirm(`Deseja forçar a verificação de ${uniqueTerms.length} termos agora?`)) {
+                    triggerSearch(uniqueTerms, this);
+                }
+            });
+
+            // Ação: Limpar Histórico (Mantém termos)
+            document.getElementById('delete-all-lotes-btn').addEventListener('click', function() {
+                if (confirm('Isso apagará os ITENS encontrados, mas manterá seus termos de busca. Continuar?')) {
+                    const btn = this;
+                    const originalText = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = '⏳ Apagando...';
+
+                    fetch('/api/lotes/delete-all', {
+                        method: 'DELETE'
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        alert('Histórico limpo com sucesso!');
+                        loadHistory(); // Recarrega a tabela (que ficará vazia)
+                    })
+                    .catch(err => alert('Erro ao limpar histórico: ' + err))
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                    });
+                }
+            });
+
+            // Ação: Resetar Sistema (Apaga Termos e Itens)
+            document.getElementById('delete-all-terms-btn').addEventListener('click', function() {
+                if (confirm('PERIGO: Isso apagará TODOS os termos de busca e TODOS os itens encontrados. O sistema ficará vazio. Continuar?')) {
+                    const btn = this;
+                    const originalText = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = '⏳ ...';
+
+                    fetch('/api/termos/delete-all', {
+                        method: 'DELETE'
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        alert('Sistema resetado com sucesso!');
+                        loadHistory(); // Recarrega a tabela (que ficará vazia)
+                    })
+                    .catch(err => alert('Erro ao resetar sistema: ' + err))
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                    });
+                }
+            });
+
+            function triggerSearch(termsList, btn) {
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '⏳ Processando...';
+
+                fetch('/api/leilao/rastrear', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ terms: termsList })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    alert('Processo iniciado! Os resultados aparecerão no histórico em breve.');
+                    // Opcional: Recarregar histórico após um tempo
+                    setTimeout(loadHistory, 5000);
+                })
+                .catch(err => alert('Erro ao iniciar varredura: ' + err))
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                });
+            }
+
+            // Modal de Foto
+            const ZOOM_LEVELS = 4; // Quantidade de níveis de zoom
+
+            window.openModal = function(src) {
+                if(!src) return;
+                photoModalImg.src = src;
+                photoModalImg.dataset.zoomLevel = '0'; // Reseta o zoom ao abrir
+                photoModal.style.display = 'flex';
+            }
+            
+            photoModal.addEventListener('click', function(e) {
+                if (e.target.id === 'foto-modal-img') {
+                    // Se clicar na imagem, aumenta o zoom
+                    let lvl = parseInt(e.target.dataset.zoomLevel || '0');
+                    e.target.dataset.zoomLevel = (lvl + 1) % ZOOM_LEVELS;
+                } else {
+                    // Se clicar fora, fecha
+                    this.style.display = 'none';
+                }
+            });
+
+            // Listener para fechar modal com ESC
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && photoModal.style.display === 'flex') {
+                    photoModal.style.display = 'none';
+                }
+            });
+
+            // Função para deletar item individual
+            window.deleteItem = function(id) {
+                if (!confirm('Tem certeza que deseja remover este item?')) return;
+
+                fetch(`/auction/item/${id}`, {
+                    method: 'DELETE'
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success' || data.message) {
+                        historyCache = historyCache.filter(i => i.id != id);
+                        applyFiltersAndSort();
+                        updateStats(historyCache);
+                    } else {
+                        alert('Erro ao deletar: ' + (data.message || 'Erro desconhecido'));
+                    }
+                })
+                .catch(err => alert('Erro de comunicação: ' + err));
+            }
+
+            // Ordenação da Tabela
+            document.querySelectorAll('#resultados th[data-sort-col]').forEach(th => {
+                th.addEventListener('click', () => {
+                    const column = th.dataset.sortCol;
+                    if (sortColumn === column) {
+                        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        sortColumn = column;
+                        sortDirection = 'asc';
+                    }
+                    applyFiltersAndSort();
+                });
+            });
+
+            function updateSortHeaders() {
+                document.querySelectorAll('#resultados th[data-sort-col]').forEach(th => {
+                    th.classList.remove('sort-active');
+                    const icon = th.querySelector('.sort-icon');
+                    if (icon) icon.textContent = '⬍';
+                    if (th.dataset.sortCol === sortColumn) {
+                        th.classList.add('sort-active');
+                        if (icon) icon.textContent = sortDirection === 'asc' ? '▲' : '▼';
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
