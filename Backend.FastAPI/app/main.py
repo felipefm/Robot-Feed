@@ -17,7 +17,6 @@ from fastapi.responses import HTMLResponse
 
 # Importação dos Roteadores Modulares
 from app.api.routers.youtube import router as youtube_router
-from app.api.routers.correios import router as correios_router
 from app.api.routers.auctions import router as auctions_router
 from app.api.routers.summarizer import router as summarizer_router
 from app.api.routers.documents import router as documents_router
@@ -56,7 +55,6 @@ def startup_event():
 
 # ========== INCLUSÃO DOS ROTEADORES MODULARES ==========
 app.include_router(youtube_router)
-app.include_router(correios_router)
 app.include_router(auctions_router)
 app.include_router(summarizer_router)
 app.include_router(documents_router)

@@ -8,8 +8,8 @@ Este projeto é um backend desenvolvido em **Python** utilizando o framework **F
 A aplicação está organizada no diretório `app/`:
 * `app/main.py`: Ponto de entrada, configuração de CORS e registro de roteadores.
 * `app/core/`: Configurações centrais, conexão com banco de dados (`database.py`) e roteamento de inteligência artificial (`llm_router.py`).
-* `app/services/`: Motores de scraping (YouTube, Correios, Leilões) e processamento de documentos (PDF/EPUB).
-* `app/api/routers/`: Endpoints isolados por domínio (YouTube, Leilões, Resumos, Documentos, Correios).
+* `app/services/`: Motores de scraping (YouTube, Leilões) e processamento de documentos (PDF/EPUB).
+* `app/api/routers/`: Endpoints isolados por domínio (YouTube, Leilões, Resumos, Documentos).
 
 ### Componentes Principais:
 1.  **Multi-LLM Router:** *TENTATIVA 1 (Local):* Tenta processar o resumo utilizando o LM Studio rodando modelos como Qwen 2.5 14B via rede local, aproveitando o poder de processamento de GPUs AMD/NVIDIA.
@@ -57,7 +57,6 @@ A documentação completa pode ser testada nativamente no Swagger UI. Abaixo est
 * **YouTube & Twitch (`/app/api/routers/youtube.py`):** Status de lives, detalhes de canais e duração de transmissões.
 * **Video & Text Summary (`/app/api/routers/summarizer.py`):** Resumo inteligente via Multi-LLM para vídeos do YouTube e textos avulsos.
 * **Auctions (`/app/api/routers/auctions.py`):** Motor de busca em dezenas de sites de leilão, salvamento em cache e histórico local.
-* **Correios (`/app/api/routers/correios.py`):** Rastreio de encomendas contornando captchas via integração externa.
 * **Document Extraction (`/app/api/routers/documents.py`):** Processamento, extração e fatiamento inteligente de arquivos PDF e EPUB.
 * **Isaac Shield:** Gerenciamento da lista de canais bloqueados e tela de bloqueio do monitor digital.
 

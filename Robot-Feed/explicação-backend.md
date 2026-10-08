@@ -79,16 +79,6 @@ O sistema busca em diversos sites de leilão (ex: RT Leilões, Sodré Santoro, e
 | `DELETE` | `/auction/terms` | **Delete Terms:** <br>- Sem query param: Remove todos os termos e itens.<br>- Com `?termo=X`: Remove apenas o termo X e seus itens. |
 | `DELETE` | `/auction/item/{item_id}` | **Delete Item:** Remove um item específico pelo ID do banco de dados. |
 
-### 📦 Correios (Rastreamento)
-
-Integração com API do SeuRastreio para consulta simplificada sem captcha.
-
-| Método | Endpoint | Descrição |
-| :--- | :--- | :--- |
-| `POST` | `/correios/track` | Consulta direta do objeto usando o token configurado. <br>**Body:** `{"object_code": "NN110248660BR"}` |
-
-
-
 ---
 
 ## 🎵 Ferramentas Adicionais

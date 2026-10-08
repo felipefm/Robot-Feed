@@ -1,7 +1,7 @@
 # 📑 Manual de Contexto: Projeto Robot Feed (Backend & Monitor)
 
 ### 1. Visão Geral e Propósito
-O **Robot Feed** é um ecossistema de automação pessoal e "vigia digital". Ele liberta o usuário da necessidade de checar plataformas manualmente. O sistema monitora canais do YouTube (via RSS), rastreia encomendas dos Correios, busca lotes em sites de leilões e processa documentos longos para gerar resumos inteligentes.
+O **Robot Feed** é um ecossistema de automação pessoal e "vigia digital". Ele liberta o usuário da necessidade de checar plataformas manualmente. O sistema monitora canais do YouTube (via RSS), busca lotes em sites de leilões e processa documentos longos para gerar resumos inteligentes.
 
 ### 2. Infraestrutura e Hardware
 * **Servidor Principal:** Raspberry Pi rodando **CasaOS** (gerenciamento via Docker).
@@ -16,7 +16,7 @@ O **Robot Feed** é um ecossistema de automação pessoal e "vigia digital". Ele
     3.  **TENTATIVA 3 (Nuvem):** Mistral AI (camada final de redundância).
 * **Processamento de Documentos:** Endpoints para extração de `PDF` (PyMuPDF/fitz) e `EPUB` (EbookLib). Possui limpeza de texto automática e função de **Split (Fatiamento)** para evitar estouro de VRAM na GPU local em textos longos.
 * **Persistência:** Banco de dados **SQLite** (`cache_leilao.db`) para histórico de lotes, termos de busca e cache de vídeos.
-* **Scrapers:** Motor assíncrono (`asyncio` + `BeautifulSoup`) para rastreio de Correios (via API SeuRastreio) e múltiplos sites de leilão simultaneamente.
+* **Scrapers:** Motor assíncrono (`asyncio` + `BeautifulSoup`) para múltiplos sites de leilão simultaneamente.
 
 ### 4. Interface e Interação (Bot Telegram & Web)
 * **Voz do Sistema:** Bot do Telegram que envia notificações de novas Lives e recebe comandos para resumir vídeos ou textos.
