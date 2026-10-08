@@ -131,6 +131,14 @@ def inspect_and_migrate() -> None:
                 logger.info("Migração: Tabela 'summary_queue' verificada/criada.")
             except Exception as e:
                 logger.error(f"Erro ao verificar/criar tabela 'summary_queue': {e}")
-    
+
+            # Tabela de Cifras (Músicas)
+            try:
+                from models import Musica
+                Musica.__table__.create(conn, checkfirst=True)
+                logger.info("Migração: Tabela 'musica' verificada/criada.")
+            except Exception as e:
+                logger.error(f"Erro ao verificar/criar tabela 'musica': {e}")
+
     except Exception as e:
         logger.error(f"Erro na migração de DB: {e}")

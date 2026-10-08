@@ -235,6 +235,53 @@ def process_telegram_command(message_text, app):
                     
         threading.Thread(target=add_to_queue, args=(app,)).start()
 
+    elif message_text.strip().lower() in ['/help', '/ajuda']:
+        help_msg = (
+            "🤖 <b>Menu de Comandos do Robot Feed</b>\n\n"
+            "Aqui estão os comandos que eu entendo até o momento:\n\n"
+            "📝 <b>/resume [URL_DO_VIDEO]</b>\n"
+            "↳ <i>Baixa, transcreve e gera o resumo de um vídeo imediatamente. Salva no cofre ao finalizar.</i>\n\n"
+            "📥 <b>/fila [URL_DO_VIDEO]</b>\n"
+            "↳ <i>Adiciona o vídeo à fila de processamento em segundo plano para não sobrecarregar a API.</i>\n\n"
+            "🧹 <b>/limparplex</b>\n"
+            "↳ <i>Remove todos os vídeos já assistidos do servidor Plex.</i>\n\n"
+            "💡 <i>Dica: Envie o link completo do YouTube ou o link curto (youtu.be).</i>"
+        )
+        send_telegram_message(help_msg, force=True)
+
+    elif message_text.strip().lower() in ['/limparplex', '/limpar_plex', '/limpar']:
+        send_telegram_message("🧹 <b>Limpando Plex...</b>\nSolicitando a exclusão dos vídeos assistidos.", force=True)
+        
+        def run_plex_cleanup(app_instance):
+            with app_instance.app_context():
+                try:
+                    # Faz a requisição DELETE para o seu backend (ajuste o IP se necessário)
+                    url = 'http://192.168.0.11:8000/plex/limpar-assistidos'
+                    resp = requests.delete(url, timeout=60)
+                    
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        mensagem_principal = data.get('message', 'Limpeza concluída.')
+                        apagados = data.get('apagados', [])
+                        
+                        if apagados:
+                            # Formata a lista com um emoji de lixeira para cada item
+                            lista_formatada = "\n".join([f"🗑️ <i>{video}</i>" for video in apagados])
+                            msg_final = f"✅ <b>Limpeza Concluída!</b>\n{mensagem_principal}\n\n<b>Vídeos Removidos:</b>\n{lista_formatada}"
+                        else:
+                            msg_final = f"✅ <b>Limpeza Concluída!</b>\n{mensagem_principal}\nNenhum vídeo precisou ser removido."
+                            
+                        send_telegram_message(msg_final, force=True)
+                    else:
+                        send_telegram_message(f"❌ <b>Erro na limpeza do Plex:</b> O servidor retornou status {resp.status_code}.", force=True)
+                except requests.Timeout:
+                    send_telegram_message("❌ <b>Erro:</b> O servidor demorou muito para responder (Timeout).", force=True)
+                except Exception as e:
+                    logger.error(f"Erro na thread de limpeza do Plex: {e}")
+                    send_telegram_message(f"❌ <b>Erro Interno de Conexão:</b> {str(e)}", force=True)
+                
+        threading.Thread(target=run_plex_cleanup, args=(app,)).start()
+
 def telegram_polling_worker(app):
     """Loop infinito que busca novas mensagens no Telegram"""
     global last_update_id

@@ -19,7 +19,8 @@ from utils.helpers import build_api_endpoint
 from routes import (
     monitor_bp, setup_monitor_blueprint,
     resumo_bp, setup_resumo_blueprint,
-    leiloes_bp, setup_leiloes_blueprint
+    leiloes_bp, setup_leiloes_blueprint,
+    cifras_bp, setup_cifras_blueprint
 )
 
 # ============================================================================
@@ -244,6 +245,11 @@ def setup_blueprints():
     setup_leiloes_blueprint(app, log_path)
     app.register_blueprint(leiloes_bp)
     logger.info("✅ Blueprint 'leiloes_bp' registrado")
+
+    # Cifras Blueprint
+    setup_cifras_blueprint(app, data_dir)
+    app.register_blueprint(cifras_bp)
+    logger.info("✅ Blueprint 'cifras_bp' registrado")
 
 
 # ============================================================================

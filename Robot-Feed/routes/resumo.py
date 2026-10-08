@@ -104,7 +104,7 @@ def api_resumo():
         logger.info(f"📺 Gerando resumo para: {video_url}")
         
         # Proxy para o backend de IA (Atualizado para a nova rota)
-        api_url = build_api_endpoint('/summarize-video', 'youtube')
+        api_url = build_api_endpoint('/api/summarize-video', 'youtube')
         
         try:
             response = requests.post(
@@ -393,6 +393,24 @@ def add_to_queue_web():
         # Verifica duplicatas
         existing = SummaryQueue.query.filter_by(video_url=video_url).first()
         if existing:
+            if existing.status == 'failed':
+                # Tentativa anterior falhou: recoloca na fila em vez de bloquear
+                existing.status = 'pending'
+                existing.created_at = datetime.utcnow()
+                db.session.commit()
+                logger.info(f"🔁 Item {existing.id} (falho) recolocado na fila para nova tentativa")
+
+                msg = 'Vídeo recolocado na fila para nova tentativa'
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({
+                        'status': 'success',
+                        'message': msg,
+                        'queue_item_id': existing.id
+                    }), 200
+                else:
+                    flash(f'✅ {msg}', 'success')
+                    return redirect(url_for('resumo.resumo_index'))
+
             msg = 'Este vídeo já está na fila de processamento'
             logger.warning(f"⚠️ {msg}")
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -718,10 +736,10 @@ def fila_process_now():
             'message': str(e)
         }), 500
 
-@resumo_bp.route('/delete_cofre/<video_id>', methods=['POST'])
-def delete_cofre(video_id):
+@resumo_bp.route('/delete_cofre/<int:archive_id>', methods=['POST'])
+def delete_cofre(archive_id):
     """Deleta um resumo arquivado no Cofre"""
-    archive = VideoArchive.query.filter_by(video_id=video_id).first()
+    archive = VideoArchive.query.get(archive_id)
     if archive:
         try:
             db.session.delete(archive)

@@ -79,7 +79,7 @@
                                     <strong>Data de Publicação Original:</strong> {{ video.published_at or 'Desconhecida' }} <br>
                                     <strong>Link Original:</strong> <a href="https://youtube.com/watch?v={{ video.video_id }}" target="_blank" style="color: #4CAF50; text-decoration: none;">Assistir Vídeo no YouTube</a>
                                 </p>
-                                <form action="{{ url_for('resumo.delete_cofre', video_id=video.video_id) }}" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja apagar este resumo do cofre?');">
+                                <form action="{{ url_for('resumo.delete_cofre', archive_id=video.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja apagar este resumo do cofre?');">
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Deletar Resumo">
                                         🗑️ Deletar
                                     </button>

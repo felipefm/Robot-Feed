@@ -83,3 +83,16 @@ class VideoArchive(db.Model):
     is_favorite = db.Column(db.Boolean, default=False)
     provider = db.Column(db.Text, nullable=True)
     tokens_used = db.Column(db.Integer, nullable=True)
+
+
+class Musica(db.Model):
+    __tablename__ = 'musica'
+
+    id = db.Column(db.Integer, primary_key=True)
+    slug = db.Column(db.String(120), unique=True, nullable=False)
+    titulo = db.Column(db.String(200), nullable=False)
+    artista = db.Column(db.String(200), nullable=True)
+    tom_original = db.Column(db.String(5), nullable=True)
+    capotraste = db.Column(db.Integer, nullable=True)
+    conteudo = db.Column(db.Text, nullable=False)  # Lista de blocos (acordes + letra) serializada em JSON
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
