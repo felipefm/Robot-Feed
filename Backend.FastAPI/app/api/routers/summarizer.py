@@ -15,19 +15,20 @@ import re
 
 import yt_dlp
 from youtube_transcript_api import (
-    YouTubeTranscriptApi,
     NoTranscriptFound,
     TranscriptsDisabled,
     VideoUnavailable,
+    RequestBlocked,
 )
 import requests
 
 # Importa funções do LLM router
 from app.core.llm_router import (
-    read_prompt_from_file,
+    read_system_prompt_from_file,
     call_llm_router,
-    process_summary_text,
+    process_youtube_summary,
 )
+from app.core.transcript_client import fetch_transcript
 
 logger = logging.getLogger(__name__)
 
@@ -179,9 +180,7 @@ def get_formatted_transcript(video_id: str) -> str:
     """
     try:
         # Tenta baixar transcrição em português ou inglês
-        transcript_list = YouTubeTranscriptApi().fetch(
-            video_id, languages=['pt', 'en']
-        )
+        transcript_list = fetch_transcript(video_id, languages=['pt', 'en'])
         
         formatted_segments = []
         for segment in transcript_list:
@@ -214,6 +213,14 @@ def get_formatted_transcript(video_id: str) -> str:
         raise ValueError("Transcrições desativadas para este vídeo.")
     except VideoUnavailable:
         raise ValueError("Vídeo indisponível ou privado.")
+    except RequestBlocked as e:
+        # Cobre também IpBlocked (subclasse de RequestBlocked).
+        logger.error(f"YouTube bloqueou a requisição de transcrição ({video_id}): {e}")
+        raise ValueError(
+            "YouTube bloqueou o IP do servidor para requisições de transcrição. "
+            "Configure um proxy (WEBSHARE_PROXY_USERNAME/PASSWORD ou "
+            "YTT_PROXY_HTTP_URL/YTT_PROXY_HTTPS_URL) para contornar o bloqueio."
+        )
     except Exception as e:
         logger.error(f"Erro ao obter transcrição do vídeo {video_id}: {e}")
         raise ValueError(f"Falha ao recuperar transcrição: {e}")
@@ -267,7 +274,7 @@ def save_summary_to_db(
     
     try:
         response = requests.post(
-            "http://192.168.0.11:5000/api/archive-summary",
+            "http://192.168.0.11:5000/archive-summary",
             json=payload,
             timeout=10
         )
@@ -332,6 +339,7 @@ async def summarize_video_endpoint(request: VideoSummaryRequest):
         status="Erro",
         error_log="Processamento iniciado com erro desconhecido.",
     )
+    video_id = None
 
     try:
         # 1. Extrai metadados do vídeo
@@ -356,16 +364,16 @@ async def summarize_video_endpoint(request: VideoSummaryRequest):
         response_data.transcript = formatted_transcript
 
         # 3. Lê prompt customizado
-        prompt_text = await run_in_threadpool(read_prompt_from_file)
+        system_prompt = await run_in_threadpool(read_system_prompt_from_file)
 
         # 4. Roteamento LLM em cascata
         llm_result = await run_in_threadpool(
-            call_llm_router, prompt_text, formatted_transcript
+            call_llm_router, system_prompt, formatted_transcript
         )
         
         # 5. Processa resumo (remove avisos, adiciona links)
         raw_summary = llm_result["summary"]
-        processed_summary = process_summary_text(raw_summary, video_id)
+        processed_summary = process_youtube_summary(raw_summary, video_id)
         
         # 6. Preenche dados de sucesso
         response_data.summary = processed_summary
@@ -399,7 +407,7 @@ async def summarize_video_endpoint(request: VideoSummaryRequest):
         # 7. Sempre salva no banco (sucesso ou erro)
         saved_id = await run_in_threadpool(
             save_summary_to_db,
-            response_data.url,
+            video_id or response_data.url,
             response_data.transcript,
             response_data.summary,
             response_data.channel_name,

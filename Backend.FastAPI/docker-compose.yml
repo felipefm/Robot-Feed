@@ -16,10 +16,13 @@ services:
             GEMINI_API_KEY: COLOQUE_SUA_CHAVE_AQUI
             GROQ_API_KEY: COLOQUE_SUA_CHAVE_AQUI
             MISTRAL_API_KEY: COLOQUE_SUA_CHAVE_AQUI
-            OLLAMA_HOST_IP: 192.168.0.10
-            OLLAMA_MODEL: google/gemma-3-12b
+            OLLAMA_HOST_IP: 192.168.0.2
+            OLLAMA_MODEL: google/gemma-4-e4b
             OLLAMA_MODEL_OLD2: qwen2.5-14b-instruct-1m
             OLLAMA_MODEL_old: qwen3-14b-claude-sonnet-4.5-reasoning-distill
+            PLEX_LIBRARY_NAME: Desenhos
+            PLEX_TOKEN: COLOQUE_SEU_TOKEN_AQUI
+            PLEX_URL: http://192.168.0.11:32400
         hostname: backend-fastapi
         image: robot-feed-backend:prd
         labels:
@@ -44,6 +47,9 @@ services:
               read_only: true
               bind:
                 create_host_path: true
+            - type: bind
+              source: /DATA/AppData/Music
+              target: /MusicPlex
 networks:
     default:
         name: backend_fastapi_default

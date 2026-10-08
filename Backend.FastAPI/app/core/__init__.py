@@ -18,9 +18,9 @@ from .database import (
 )
 
 from .llm_router import (
-    read_prompt_from_file,
+    read_system_prompt_from_file,
     call_llm_router,
-    process_summary_text
+    process_youtube_summary
 )
 
 __all__ = [
@@ -38,7 +38,7 @@ __all__ = [
     "AuctionHistoryItem",
     "LEILAO_URLS",
     # LLM Router functions
-    "read_prompt_from_file",
+    "read_system_prompt_from_file",
     "call_llm_router",
-    "process_summary_text",
+    "process_youtube_summary",
 ]

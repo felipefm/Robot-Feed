@@ -14,15 +14,15 @@ logger = logging.getLogger(__name__)
 
 # ========== FUNÇÕES AUXILIARES ==========
 
-def read_prompt_from_file(file_name: str = "prompt.txt") -> str:
+def read_system_prompt_from_file(file_name: str = "prompt.txt") -> str:
     """
-    Lê o prompt de um arquivo local, com fallback para prompt padrão.
+    Lê um prompt de sistema de um arquivo local, com fallback para prompt padrão.
     
     Args:
-        file_name: Nome do arquivo de prompt (relativo ao diretório do script)
+        file_name: Nome do arquivo de prompt (relativo ao diretório raiz do projeto)
         
     Returns:
-        Conteúdo do arquivo de prompt ou prompt padrão
+        Conteúdo do arquivo de prompt ou prompt padrão genérico
     """
     try:
         # Constrói o caminho relativo ao diretório do script
@@ -35,47 +35,39 @@ def read_prompt_from_file(file_name: str = "prompt.txt") -> str:
             return f.read().strip()
     except FileNotFoundError:
         logger.warning(f"Arquivo de prompt '{file_name}' não encontrado em {file_path}. Usando prompt padrão.")
-        return (
-            "Faça um resumo detalhado dos principais tópicos deste vídeo, "
-            "com base na transcrição do vídeo. Me traga em qual minuto (início e fim) "
-            "que foi falado o tópico com link para que eu acesse diretamente."
-        )
+        return "Processe os dados fornecidos de acordo com as melhores práticas."
     except Exception as e:
         logger.error(f"Erro ao ler arquivo de prompt '{file_name}' em {file_path}: {e}. Usando prompt padrão.")
-        return (
-            "Faça um resumo detalhado dos principais tópicos deste vídeo, "
-            "com base na transcrição do vídeo. Me traga em qual minuto (início e fim) "
-            "que foi falado o tópico com link para que eu acesse diretamente."
-        )
+        return "Processe os dados fornecidos de acordo com as melhores práticas."
 
 
 # ========== ROTEADOR LLM ==========
 
-def call_llm_router(prompt: str, transcript: str) -> Dict[str, Any]:
+def call_llm_router(system_prompt: str, user_content: str) -> Dict[str, Any]:
     """
-    Roteador Inteligente em Cascata: Tenta resumir usando múltiplas APIs em ordem de prioridade.
+    Roteador Inteligente em Cascata: Tenta processar conteúdo usando múltiplas APIs em ordem de prioridade.
     
     Ordem de prioridade:
     1. LM STUDIO LOCAL (GPU Windows via Rede)
-    2. GEMINI (Nuvem - Melhor para vídeos muito longos)
+    2. GEMINI (Nuvem - Melhor para conteúdo muito longo)
     3. GROQ (Ultra rápido)
     4. DEEPSEEK (Excelente custo-benefício)
     5. MISTRAL (Reserva de segurança)
     
     Args:
-        prompt: Instrução de como fazer o resumo
-        transcript: Transcrição do vídeo formatada com timestamps
+        system_prompt: Diretrizes/instruções de como processar o conteúdo
+        user_content: Dados de entrada a serem processados
         
     Returns:
         Dicionário com:
-            - summary: Texto do resumo gerado
+            - summary: Texto da resposta gerada
             - tokens_used: Número de tokens consumidos (se disponível)
             - provider: Nome do provedor utilizado
             
     Raises:
         ValueError: Se todas as opções falharem
     """
-    full_content = f"Prompt: {prompt}\n\nTranscrição do Vídeo:\n{transcript}"
+    full_content = f"Diretrizes:\n{system_prompt}\n\nDados:\n{user_content}"
     erros = []
 
     # 1. TENTATIVA 1: LM STUDIO LOCAL (GPU Windows via Rede)
@@ -91,7 +83,7 @@ def call_llm_router(prompt: str, transcript: str) -> Dict[str, Any]:
                 messages=[{"role": "user", "content": full_content}],
                 temperature=0.3
             )
-            logger.info(f"Resumo gerado com sucesso pelo: LM STUDIO ({ollama_model})")
+            logger.info(f"Resposta gerada com sucesso pelo: LM STUDIO ({ollama_model})")
             return {
                 "summary": response.choices[0].message.content,
                 "tokens_used": response.usage.total_tokens if response.usage else None,
@@ -100,7 +92,7 @@ def call_llm_router(prompt: str, transcript: str) -> Dict[str, Any]:
     except Exception as e:
         erros.append(f"Ollama Local (Erro: {e})")
 
-    # 2. TENTATIVA 2: GEMINI (Nuvem - Melhor para vídeos muito longos)
+    # 2. TENTATIVA 2: GEMINI (Nuvem - Melhor para conteúdo muito longo)
     try:
         gemini_api_key = os.getenv("GEMINI_API_KEY")
         if gemini_api_key:
@@ -110,7 +102,7 @@ def call_llm_router(prompt: str, transcript: str) -> Dict[str, Any]:
                 model='gemini-2.5-flash',
                 contents=full_content
             )
-            logger.info("Resumo gerado com sucesso pelo: GEMINI")
+            logger.info("Resposta gerada com sucesso pelo: GEMINI")
             return {
                 "summary": response.text,
                 "tokens_used": (
@@ -133,7 +125,7 @@ def call_llm_router(prompt: str, transcript: str) -> Dict[str, Any]:
                 messages=[{"role": "user", "content": full_content}],
                 temperature=0.3
             )
-            logger.info("Resumo gerado com sucesso pelo: GROQ")
+            logger.info("Resposta gerada com sucesso pelo: GROQ")
             return {
                 "summary": response.choices[0].message.content,
                 "tokens_used": response.usage.total_tokens if response.usage else None,
@@ -152,7 +144,7 @@ def call_llm_router(prompt: str, transcript: str) -> Dict[str, Any]:
                 messages=[{"role": "user", "content": full_content}],
                 temperature=0.3
             )
-            logger.info("Resumo gerado com sucesso pelo: DEEPSEEK")
+            logger.info("Resposta gerada com sucesso pelo: DEEPSEEK")
             return {
                 "summary": response.choices[0].message.content,
                 "tokens_used": response.usage.total_tokens if response.usage else None,
@@ -171,7 +163,7 @@ def call_llm_router(prompt: str, transcript: str) -> Dict[str, Any]:
                 messages=[{"role": "user", "content": full_content}],
                 temperature=0.3
             )
-            logger.info("Resumo gerado com sucesso pelo: MISTRAL")
+            logger.info("Resposta gerada com sucesso pelo: MISTRAL")
             return {
                 "summary": response.choices[0].message.content,
                 "tokens_used": response.usage.total_tokens if response.usage else None,
@@ -187,40 +179,36 @@ def call_llm_router(prompt: str, transcript: str) -> Dict[str, Any]:
     )
 
 
-# ========== PÓS-PROCESSAMENTO ==========
+# ========== PÓS-PROCESSAMENTO (ESPECÍFICO PARA YOUTUBE) ==========
 
-def process_summary_text(summary: str, video_id: str) -> str:
+def process_youtube_summary(summary: str, video_id: str) -> str:
     """
-    Processa o resumo gerado pela IA para:
-    1. Remover o aviso padrão informando que não é possível gerar links
-    2. Encontrar padrões de tempo (MM:SS ou HH:MM:SS) e transformá-los em links clicáveis
+    Processa resumo específico para YouTube:
+    1. Remove avisos padrão sobre geração de links
+    2. Converte timestamps (MM:SS ou HH:MM:SS) em links clicáveis
     
     Args:
         summary: Texto do resumo bruto da IA
-        video_id: ID do vídeo do YouTube para gerar os links
+        video_id: ID do vídeo do YouTube
         
     Returns:
-        Resumo processado com links e sem avisos
+        Resumo processado com links clicáveis
     """
-    # 1. Remover a "Observação sobre os links" gerada pela IA (se existir)
+    # 1. Remover avisos sobre links
     disclaimer_pattern = r"(?i)\n*\*?\*?Observação sobre os links:?\*?\*?.*?(?=\n\n|\Z)"
     summary = re.sub(disclaimer_pattern, "", summary, flags=re.DOTALL)
     
-    # 2. Substituir tempos por links clicáveis
+    # 2. Converter timestamps em links
     def time_replacer(match):
         """Converte timestamp em link para o YouTube."""
         time_str = match.group(1)
         parts = time_str.split(':')
         try:
-            # Converte para segundos (suporta MM:SS e HH:MM:SS)
             secs = sum(int(x) * (60 ** i) for i, x in enumerate(reversed(parts)))
             return f"[{time_str}](https://youtu.be/{video_id}?t={secs})"
         except ValueError:
-            # Retorna original em caso de erro
             return match.group(0)
 
-    # Regex para capturar tempos como 12:34 ou 1:23:45
-    # Ignora se já for link (não captura se estiver entre () imediatamente após)
     time_pattern = r'\[?(\b\d{1,2}:\d{2}(?::\d{2})?\b)\]?(?!\s*\()'
     summary = re.sub(time_pattern, time_replacer, summary)
     

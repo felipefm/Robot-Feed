@@ -11,7 +11,12 @@ import asyncio
 import logging
 
 # Importa funções do scraper
-from scraper import is_channel_live, get_channel_details, get_live_stream_duration
+from app.services.youtube_scraper import (
+    is_channel_live, 
+    get_channel_details, 
+    get_live_stream_duration, 
+    process_youtube_clip
+)
 
 logger = logging.getLogger(__name__)
 
@@ -174,3 +179,47 @@ async def get_live_duration_endpoint(video_url: str):
         )
     
     return details
+
+class ClipRequest(BaseModel):
+    """Payload para solicitar o corte de um vídeo e transcrição."""
+    video_url: str
+    start_time: str  # Ex: "01:20" ou "30"
+    end_time: str    # Ex: "02:45" ou "120"
+
+class ClipResponse(BaseModel):
+    """Resposta com os caminhos dos arquivos gerados e uma prévia do texto."""
+    message: str
+    video_file_path: str
+    txt_file_path: str
+    transcript_text: str
+
+@router.post(
+    "/create-clip",
+    response_model=ClipResponse,
+    tags=["Video Processing"],
+    summary="Criar Clip de Vídeo e Transcrição",
+    description="Corta um trecho específico de um vídeo e gera um TXT da transcrição correspondente."
+)
+async def create_video_clip_endpoint(payload: ClipRequest):
+    """
+    Recebe a URL de um vídeo, o tempo inicial e final, e gera o recorte.
+    """
+    try:
+        # Executa em uma thread separada porque o download bloqueia o servidor
+        resultado = await run_in_threadpool(
+            process_youtube_clip, 
+            payload.video_url, 
+            payload.start_time, 
+            payload.end_time
+        )
+        
+        return {
+            "message": "Clip gerado com sucesso!",
+            "video_file_path": resultado["video_path"],
+            "txt_file_path": resultado["txt_path"],
+            "transcript_text": resultado["transcript_preview"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro ao processar o clip: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

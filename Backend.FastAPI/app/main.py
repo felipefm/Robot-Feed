@@ -21,8 +21,8 @@ from app.api.routers.correios import router as correios_router
 from app.api.routers.auctions import router as auctions_router
 from app.api.routers.summarizer import router as summarizer_router
 from app.api.routers.documents import router as documents_router
-
-# Importação da Inicialização do Banco de Dados
+from app.api.routers.plex import router as plex_router
+from app.api.routers.music import router as music_router
 from app.core.database import init_db
 
 # ========== LOGGING ==========
@@ -60,6 +60,8 @@ app.include_router(correios_router)
 app.include_router(auctions_router)
 app.include_router(summarizer_router)
 app.include_router(documents_router)
+app.include_router(plex_router)
+app.include_router(music_router)
 
 # ========== ENDPOINTS REMANESCENTES (ISAAC SHIELD & ROOT) ==========
 
