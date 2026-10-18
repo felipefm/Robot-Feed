@@ -35,7 +35,8 @@ def check_feeds():
         check_progress['running'] = True
         check_progress['status'] = 'Iniciando...'
         check_progress['current'] = 0
-        
+        check_progress['total'] = 0
+
         # Prepara URL da API
         conf = get_config()
         

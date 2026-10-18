@@ -42,6 +42,19 @@ def setup_monitor_blueprint(app, log_path_ref, check_feeds_func):
     check_feeds_with_context = check_feeds_func
 
 
+def _wants_json():
+    """True quando a chamada veio do fetch() do dashboard (ações sem recarregar a página)"""
+    return request.headers.get('X-Requested-With') == 'fetch'
+
+
+def _reply(ok, message, **extra):
+    """Responde em JSON para o fetch() ou com flash + redirect para navegação normal"""
+    if _wants_json():
+        return jsonify({'ok': ok, 'message': message, **extra}), (200 if ok else 400)
+    flash(message, 'success' if ok else 'error')
+    return redirect(url_for('monitor.index'))
+
+
 @monitor_bp.route('/')
 def index():
     """Renderiza a página principal de monitoramento"""
@@ -52,23 +65,30 @@ def index():
 
     # Lógica de Tempo (Última e Próxima Verificação)
     job = scheduler.get_job('feed_job')
-    next_check_str = "--"
+    next_check_seconds = None
     last_check_str = "--:--"
 
     last_check_time = get_last_check_time()
     if last_check_time:
-        last_check_str = last_check_time.strftime('%H:%M')
-    
+        last_check_str = last_check_time.strftime('%d/%m %H:%M')
+
     if job and job.next_run_time:
         try:
             now = datetime.now(job.next_run_time.tzinfo)
             delta = job.next_run_time - now
-            minutes = int(delta.total_seconds() / 60)
-            next_check_str = f"{max(0, minutes)} min"
+            next_check_seconds = max(0, int(delta.total_seconds()))
         except Exception:
             pass
 
-    return render_template('index.html', channels=channels, config=config, last_check=last_check_str, next_check=next_check_str, active_page='monitor')
+    # Modo silencioso: None ou -1 significam desativado
+    mute_enabled = config.mute_start_hour is not None and config.mute_start_hour >= 0 \
+        and config.mute_end_hour is not None and config.mute_end_hour >= 0
+
+    return render_template('index.html', channels=channels, config=config,
+                           last_check=last_check_str, next_check_seconds=next_check_seconds,
+                           mute_enabled=mute_enabled,
+                           tg_token_configured=bool(config.telegram_token),
+                           active_page='monitor')
 
 
 @monitor_bp.route('/add_channel', methods=['POST'])
@@ -142,8 +162,9 @@ def update_config():
         mute_start = request.form.get('mute_start', '-1')
         mute_end = request.form.get('mute_end', '-1')
         
-        conf.mute_start_hour = int(mute_start) if int(mute_start) >= 0 else None
-        conf.mute_end_hour = int(mute_end) if int(mute_end) >= 0 else None
+        # -1 = desativado (é o valor que telegram_bot.is_mute_active espera; None quebraria a comparação)
+        conf.mute_start_hour = int(mute_start) if int(mute_start) >= 0 else -1
+        conf.mute_end_hour = int(mute_end) if int(mute_end) >= 0 else -1
         
         # Telegram
         if request.form.get('tg_token'):
@@ -181,43 +202,46 @@ def update_config():
     
     return redirect(url_for('monitor.index'))
 
-@monitor_bp.route('/toggle_mute/<int:id>')
+@monitor_bp.route('/toggle_mute/<int:id>', methods=['POST'])
 def toggle_mute(id):
     """Alterna o silêncio de notificações de um canal"""
     channel = Channel.query.get(id)
-    if channel:
-        # Lógica Inteligente:
-        # 1. Se estiver AO VIVO, o botão alterna o silêncio APENAS daquela live específica.
-        if channel.is_live and channel.last_live_id:
-            if channel.muted_live_id == channel.last_live_id:
-                channel.muted_live_id = None # Reativar avisos desta live
-                flash(f'Avisos reativados para a live atual de "{channel.name}".', 'success')
-            else:
-                channel.muted_live_id = channel.last_live_id # Silenciar esta live
-                flash(f'Live atual de "{channel.name}" foi silenciada. Próximas lives avisarão normalmente.', 'success')
-        
-        # 2. Se NÃO estiver ao vivo, o botão alterna o silêncio GLOBAL.
+    if not channel:
+        return _reply(False, 'Canal não encontrado.')
+
+    # Lógica Inteligente:
+    # 1. Se estiver AO VIVO, o botão alterna o silêncio APENAS daquela live específica.
+    if channel.is_live and channel.last_live_id:
+        if channel.muted_live_id == channel.last_live_id:
+            channel.muted_live_id = None # Reativar avisos desta live
+            message = f'Avisos reativados para a live atual de "{channel.name}".'
         else:
-            channel.mute_notifications = not channel.mute_notifications
-            status = "silenciado" if channel.mute_notifications else "ativado"
-            flash(f'Notificações de "{channel.name}" foram {status} (Global).', 'success')
-            
-        db.session.commit()
-        logger.info(f"Toggle mute para canal {id}: {channel.name}")
-    return redirect(url_for('monitor.index'))
+            channel.muted_live_id = channel.last_live_id # Silenciar esta live
+            message = f'Live atual de "{channel.name}" foi silenciada. Próximas lives avisarão normalmente.'
+
+    # 2. Se NÃO estiver ao vivo, o botão alterna o silêncio GLOBAL.
+    else:
+        channel.mute_notifications = not channel.mute_notifications
+        status = "silenciado" if channel.mute_notifications else "ativado"
+        message = f'Notificações de "{channel.name}" foram {status} (Global).'
+
+    db.session.commit()
+    logger.info(f"Toggle mute para canal {id}: {channel.name}")
+    live_muted = bool(channel.is_live and channel.last_live_id and channel.muted_live_id == channel.last_live_id)
+    return _reply(True, message, muted=bool(channel.mute_notifications), live_muted=live_muted)
 
 
-@monitor_bp.route('/delete_channel/<int:id>')
+@monitor_bp.route('/delete_channel/<int:id>', methods=['POST'])
 def delete_channel(id):
     """Deleta um canal da lista de monitoramento"""
     channel = Channel.query.get(id)
-    if channel:
-        channel_name = channel.name
-        db.session.delete(channel)
-        db.session.commit()
-        logger.info(f"Canal deletado: {channel_name}")
-        flash('Canal removido.', 'success')
-    return redirect(url_for('monitor.index'))
+    if not channel:
+        return _reply(False, 'Canal não encontrado.')
+    channel_name = channel.name
+    db.session.delete(channel)
+    db.session.commit()
+    logger.info(f"Canal deletado: {channel_name}")
+    return _reply(True, f'Canal "{channel_name}" removido.')
 
 
 @monitor_bp.route('/force_check')
@@ -284,15 +308,13 @@ def docs_index():
     return render_template('docs.html', active_page='docs', docs_url=docs_url)
 
 
-@monitor_bp.route('/test_notification')
+@monitor_bp.route('/test_notification', methods=['GET', 'POST'])
 def test_notification():
     """Rota para testar o envio de mensagem"""
     success, msg = send_telegram_message("🔔 Teste de notificação do Robot Feed!")
     if success:
-        flash('✅ Sucesso! Mensagem enviada para o Telegram.', 'success')
-    else:
-        flash(f'❌ Falha no envio: {msg}', 'error')
-    return redirect(url_for('monitor.index'))
+        return _reply(True, '✅ Sucesso! Mensagem enviada para o Telegram.')
+    return _reply(False, f'❌ Falha no envio: {msg}')
 
 
 @monitor_bp.route('/get_chat_id')
@@ -324,24 +346,21 @@ def get_chat_id():
         return jsonify({"erro": str(e)})
 
 
-@monitor_bp.route('/test_live/<int:id>')
+@monitor_bp.route('/test_live/<int:id>', methods=['POST'])
 def test_live(id):
     """Simula uma notificação de Live para um canal específico"""
     channel = Channel.query.get(id)
-    if channel:
-        # Cria uma mensagem simulada
-        msg = (f"🔴 <b>TESTE DE LIVE: {channel.name}</b>\n\n"
-               f"🔗 https://www.youtube.com/channel/{channel.channel_id}")
-        
-        success, ret_msg = send_telegram_message(msg)
-        if success:
-            flash(f'📢 Simulação de Live enviada para "{channel.name}"!', 'success')
-        else:
-            flash(f'❌ Erro ao enviar simulação: {ret_msg}', 'error')
-    else:
-        flash('Canal não encontrado.', 'error')
-        
-    return redirect(url_for('monitor.index'))
+    if not channel:
+        return _reply(False, 'Canal não encontrado.')
+
+    # Cria uma mensagem simulada
+    msg = (f"🔴 <b>TESTE DE LIVE: {channel.name}</b>\n\n"
+           f"🔗 https://www.youtube.com/channel/{channel.channel_id}")
+
+    success, ret_msg = send_telegram_message(msg)
+    if success:
+        return _reply(True, f'📢 Simulação de Live enviada para "{channel.name}"!')
+    return _reply(False, f'❌ Erro ao enviar simulação: {ret_msg}')
 
 
 @monitor_bp.route('/export_channels')

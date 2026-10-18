@@ -1,57 +1,112 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-br" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitor YouTube CasaOS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f8f9fa; }
-        .card { box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: none; }
-        .card-header { font-weight: bold; }
-        
-        /* Estilo Terminal Retrô */
-        .modal-terminal .modal-content {
-            background-color: #0c0c0c;
-            border: 1px solid #333;
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+        :root {
+            --rf-bg: #0f1115;
+            --rf-surface: #171a21;
+            --rf-surface-2: #1b1f2a;
+            --rf-border: #262b36;
+            --rf-border-2: #2f3646;
+            --rf-text: #e6e8ec;
+            --rf-muted: #a9b1bf;
+            --rf-faint: #7d8696;
+            --rf-accent: #3d7bff;
+            --rf-live: #ff5c5c;
+            --rf-amber: #f5c46b;
+            --bs-body-bg: var(--rf-bg);
+            --bs-body-color: var(--rf-text);
+            --bs-border-color: var(--rf-border);
+            --bs-secondary-color: var(--rf-muted);
         }
-        .modal-terminal .modal-header { border-bottom: 1px solid #333; }
-        .modal-terminal .modal-title { color: #00ff00; font-family: 'Courier New', monospace; }
-        .modal-terminal .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+        body { background-color: var(--rf-bg); font-size: 14px; }
+        .app-nav { margin-bottom: 0 !important; }
+
+        /* Cabeçalho da página */
+        .page-head { background: #151821; border-bottom: 1px solid var(--rf-border); }
+        .page-head .btn { height: 40px; display: inline-flex; align-items: center; gap: .5rem; }
+        .scan-progress { height: 8px; background: var(--rf-border); }
+        .spin { display: inline-block; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Cards */
+        .rf-card { background: var(--rf-surface); border: 1px solid var(--rf-border); border-radius: 12px; }
+        .rf-card > .rf-card-head { padding: 14px 16px; border-bottom: 1px solid var(--rf-border); }
+        .stat-label { color: var(--rf-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+        .stat-value { font-size: 30px; font-weight: 700; line-height: 1.2; }
+        .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--rf-faint); }
+        .form-control, .form-select { background-color: var(--rf-bg); border-color: var(--rf-border-2); }
+        .btn-rf { background: var(--rf-surface-2); border: 1px solid var(--rf-border-2); color: var(--rf-text); }
+        .btn-rf:hover { background: #232838; color: #fff; border-color: #3a4256; }
+        .btn-primary { --bs-btn-bg: var(--rf-accent); --bs-btn-border-color: var(--rf-accent); }
+
+        /* Filtro segmentado */
+        .seg { background: var(--rf-bg); border: 1px solid var(--rf-border-2); border-radius: 8px; padding: 3px; }
+        .seg .btn { border: 0; height: 32px; padding: 0 12px; font-size: 13px; color: var(--rf-muted); }
+        .seg .btn.active { background: #2b3244; color: #fff; font-weight: 600; }
+
+        /* Lista de canais */
+        .ch-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 14px 16px; border-top: 1px solid #222733; }
+        .ch-row:first-child { border-top: 0; }
+        .ch-row.is-live { background: #1c1719; }
+        .ch-avatar { width: 40px; height: 40px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--rf-bg); }
+        .ch-id { font-family: monospace; font-size: 11px; color: var(--rf-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ch-badge { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 99px; }
+        .badge-live { background: var(--rf-live); color: #1a0606; font-weight: 700; letter-spacing: .04em; }
+        .badge-muted { background: var(--rf-border-2); color: #d4d9e1; }
+        .badge-live-muted { background: var(--rf-amber); color: #2a1c00; }
+        .media-link { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 8px; text-decoration: none; }
+        .media-link.live { background: #2a1517; border: 1px solid #5c2328; }
+        .media-thumb { position: relative; width: 72px; height: 40px; border-radius: 6px; flex: none; object-fit: cover; cursor: zoom-in; background: var(--rf-surface-2); }
+        .media-title { font-weight: 600; font-size: 13px; }
+        .media-meta { font-size: 12px; color: var(--rf-muted); }
+        .icon-btn { width: 40px; height: 40px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-size: 17px; }
+        .icon-btn.on { background: #3a2e12; border-color: var(--rf-amber); color: var(--rf-amber); }
+        .icon-btn.danger { color: #ff8f8f; border-color: #4a2428; }
+
+        /* Terminal de logs */
+        .terminal { background: #07090c; border: 1px solid var(--rf-border); border-radius: 12px; overflow: hidden; }
         .terminal-body {
-            background-color: #000;
-            color: #00ff00;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 0.9rem;
-            max-height: 60vh;
-            overflow-y: auto;
-            padding: 15px;
-            white-space: pre-wrap; /* Mantém quebras de linha */
+            margin: 0; padding: 14px; max-height: 50vh; overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace; font-size: .85rem;
+            color: #9fe8bd; white-space: pre-wrap; word-break: break-word;
         }
-        /* Scrollbar customizada para o terminal */
         .terminal-body::-webkit-scrollbar { width: 8px; }
         .terminal-body::-webkit-scrollbar-track { background: #000; }
         .terminal-body::-webkit-scrollbar-thumb { background: #004400; }
+
+        /* Avisos (toasts) */
+        .toast-area { position: fixed; right: 16px; bottom: 16px; z-index: 1080; display: flex; flex-direction: column; gap: 8px; max-width: calc(100vw - 32px); }
     </style>
 </head>
 <body>
     {% include 'navbar.html' %}
-    <nav class="navbar navbar-dark bg-dark mb-4">
-        <div class="container">
-            <span class="navbar-brand mb-0 h1">📺 Monitor YouTube (CasaOS)</span>
-            <div class="d-flex align-items-center">
-                <div class="text-white me-3 text-end d-none d-sm-block" style="font-size: 0.75rem; line-height: 1.2;">
-                    <span class="text-muted">Última:</span> <strong>{{ last_check }}</strong><br>
-                    <span class="text-muted">Próxima:</span> <strong>{{ next_check }}</strong>
+
+    <!-- Cabeçalho do Monitor -->
+    <header class="page-head mb-4">
+        <div class="container py-2">
+            <div class="d-flex flex-wrap align-items-center gap-2 gap-md-3">
+                <h1 class="h5 mb-0 me-auto"><i class="bi bi-youtube text-danger me-1"></i> Monitor YouTube</h1>
+                <button type="button" class="btn btn-rf btn-sm" onclick="toggleLogs()"><i class="bi bi-terminal"></i> Logs</button>
+                <button type="button" class="btn btn-primary btn-sm fw-semibold" id="btnScan" onclick="startCheck()"><i class="bi bi-arrow-repeat"></i> <span>Verificar agora</span></button>
+            </div>
+            <!-- Progresso inline (não bloqueia a tela) -->
+            <div id="scanBox" class="d-none align-items-center gap-3 pt-2">
+                <div class="progress scan-progress flex-grow-1" role="progressbar" aria-label="Progresso da verificação">
+                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
                 </div>
-                <button type="button" class="btn btn-outline-success btn-sm me-2" onclick="openLogModal()">📟 Logs</button>
-                <button type="button" class="btn btn-outline-light btn-sm" onclick="startCheck()">🔄 Verificar Agora</button>
+                <span id="progressText" class="small font-monospace text-secondary text-nowrap">Iniciando…</span>
+                <button type="button" class="btn btn-sm btn-link text-secondary p-0" onclick="hideScan()">Ocultar</button>
             </div>
         </div>
-    </nav>
+    </header>
 
-    <div class="container">
+    <div class="container pb-5">
         <!-- Mensagens de Feedback -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -64,230 +119,260 @@
             {% endif %}
         {% endwith %}
 
-        <div class="row">
-            <!-- Coluna Esquerda: Configurações e Adicionar -->
-            <div class="col-md-4">
-                
-                <!-- Configurações -->
-                <div class="card mb-4">
-                    <div class="card-header bg-primary text-white" role="button" data-bs-toggle="collapse" data-bs-target="#configCollapse" aria-expanded="false" aria-controls="configCollapse">
-                        ⚙️ Configurações <span class="float-end">▼</span>
-                    </div>
-                    <div class="collapse" id="configCollapse">
-                    <div class="card-body">
-                        <form action="/update_config" method="POST">
-                            <div class="mb-3">
-                                <label class="form-label">Intervalo de Verificação (minutos)</label>
-                                <input type="number" name="interval" class="form-control" value="{{ config.check_interval_minutes }}" min="1" required>
-                                <div class="form-text">De quanto em quanto tempo o robô busca novidades.</div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Repetição de Aviso de Live (minutos)</label>
-                                <input type="number" name="cooldown" class="form-control" value="{{ config.live_cooldown_minutes or 120 }}" min="10" required>
-                                <div class="form-text">Se o canal continuar ao vivo, esperar esse tempo para avisar de novo.</div>
-                            </div>
-                            
-                            <div class="mb-3 border p-2 rounded bg-light">
-                                <label class="form-label fw-bold">🌙 Modo Silencioso (Madrugada)</label>
-                                <div class="row g-2">
-                                    <div class="col">
-                                        <label class="small">Início (Hora)</label>
-                                        <input type="number" name="mute_start" class="form-control" value="{{ config.mute_start_hour if config.mute_start_hour is not none else -1 }}" min="-1" max="23" placeholder="-1">
-                                    </div>
-                                    <div class="col">
-                                        <label class="small">Fim (Hora)</label>
-                                        <input type="number" name="mute_end" class="form-control" value="{{ config.mute_end_hour if config.mute_end_hour is not none else -1 }}" min="-1" max="23" placeholder="-1">
-                                    </div>
-                                </div>
-                                <div class="form-text small">Use -1 para desativar. Ex: Início 23 e Fim 7 silencia das 23h às 07h.</div>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Telegram Token</label>
-                                <input type="password" name="tg_token" class="form-control" value="{{ config.telegram_token or '' }}" placeholder="Token do BotFather">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Telegram Chat ID</label>
-                                <input type="text" name="tg_chat_id" class="form-control" value="{{ config.telegram_chat_id or '' }}" placeholder="Seu ID numérico">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">URL da API YouTube</label>
-                                <input type="text" name="api_url" class="form-control" value="{{ config.youtube_api_url or '' }}" placeholder="http://ip-do-raspberry:8000">
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100">Salvar</button>
-                        </form>
-                        <hr class="my-3">
-                        <button type="button" class="btn btn-secondary w-100" data-bs-toggle="modal" data-bs-target="#backupModal">
-                            💾 Backup & Restauração
-                        </button>
-                    </div>
-                    </div>
+        <!-- Terminal de Logs -->
+        <section id="logPanel" class="terminal mb-4 d-none" aria-label="Logs do sistema">
+            <div class="d-flex flex-wrap align-items-center gap-3 px-3 py-2 border-bottom border-dark">
+                <span class="font-monospace" style="color: #7ee2a8;">_SYSTEM_LOGS.exe</span>
+                <div class="form-check form-switch ms-auto mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkFullLogs" onchange="loadLogs()">
+                    <label class="form-check-label small text-secondary" for="chkFullLogs">Modo Detalhado (Debug)</label>
                 </div>
+                <button type="button" class="btn btn-sm btn-outline-success" onclick="loadLogs()"><i class="bi bi-arrow-clockwise"></i> Atualizar</button>
+                <button type="button" class="btn btn-sm btn-rf" onclick="toggleLogs()">Fechar</button>
+            </div>
+            <pre id="terminalContent" class="terminal-body">Carregando dados do sistema...</pre>
+        </section>
 
-                <!-- Adicionar Canal -->
-                <div class="card mb-4">
-                    <div class="card-header bg-success text-white">➕ Novo Canal</div>
-                    <div class="card-body">
-                        <form action="/add_channel" method="POST">
-                            <div class="mb-3">
-                                <label class="form-label">Identificador</label>
-                                <input type="text" name="identifier" class="form-control" placeholder="@Canal ou ID" required>
-                                <div class="form-text">Use o @handle, ID ou URL.</div>
-                            </div>
-                            <button type="submit" class="btn btn-success w-100">Adicionar</button>
-                        </form>
-                    </div>
+        <!-- Cards de Resumo -->
+        <section class="row g-3 mb-4" aria-label="Resumo">
+            <div class="col-6 col-lg-3">
+                <div class="rf-card p-3 h-100">
+                    <div class="stat-label">Canais</div>
+                    <div class="stat-value" id="statTotal">{{ channels|length }}</div>
                 </div>
             </div>
+            <div class="col-6 col-lg-3">
+                <div class="rf-card p-3 h-100">
+                    <div class="stat-label">Ao vivo agora</div>
+                    <div class="stat-value" id="statLive" style="color: #ff7b7b;">0</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="rf-card p-3 h-100">
+                    <div class="stat-label">Silenciados</div>
+                    <div class="stat-value" id="statMuted" style="color: var(--rf-amber);">0</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="rf-card p-3 h-100">
+                    <div class="stat-label">Próxima verificação</div>
+                    <div class="stat-value font-monospace" id="countdown" data-seconds="{{ next_check_seconds if next_check_seconds is not none else '' }}">--:--</div>
+                    <div class="small text-secondary">Última: {{ last_check }} · a cada {{ config.check_interval_minutes }} min</div>
+                </div>
+            </div>
+        </section>
 
-            <!-- Coluna Direita: Lista -->
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header bg-white">
-                        📋 Canais Monitorados
-                        <span class="badge bg-secondary float-end">{{ channels|length }} canais</span>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-striped mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Nome</th>
-                                        <th>Último Vídeo</th>
-                                        <th class="text-end">Ação</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for channel in channels %}
-                                    <tr>
-                                        <td class="align-middle">
-                                            <div class="fw-bold">
-                                                {{ channel.name }}
-                                                {# Define variável auxiliar para saber se a live atual está mutada #}
-                                                {% set live_muted = channel.is_live and channel.muted_live_id == channel.last_live_id %}
-                                                
-                                                {% if channel.is_live %}
-                                                    <span class="badge bg-danger ms-1" style="font-size: 0.6em;">AO VIVO</span>
-                                                {% endif %}
-                                                {% if channel.mute_notifications %}
-                                                    <span class="badge bg-secondary ms-1" title="Canal Silenciado Globalmente">🔕 Mudo</span>
-                                                {% elif live_muted %}
-                                                    <span class="badge bg-warning text-dark ms-1" title="Apenas esta live está silenciada">🔕 Live Muta</span>
-                                                {% endif %}
-                                            </div>
-                                            <small class="text-muted" style="font-size: 0.65em;">{{ channel.channel_id }}</small>
-                                        </td>
-                                        <td class="align-middle">
-                                            <!-- SEÇÃO LIVE (Se estiver ao vivo) -->
-                                            {% if channel.is_live and channel.last_live_id %}
-                                                <div class="d-flex align-items-center mb-2 p-1 rounded border border-danger" style="background-color: rgba(220, 53, 69, 0.1);">
-                                                    {% if channel.last_live_thumb %}
-                                                        <img src="{{ channel.last_live_thumb }}" class="rounded me-2" style="width: 60px; height: auto; cursor: pointer;" onclick="showImage('{{ channel.last_live_thumb }}', '{{ channel.last_live_id }}')" title="Ver Live">
-                                                    {% endif %}
-                                                    <div style="line-height: 1.2;">
-                                                        <a href="https://www.youtube.com/watch?v={{ channel.last_live_id }}" target="_blank" class="text-decoration-none fw-bold small text-danger">🔴 AO VIVO 🔗</a>
-                                                        <div class="text-muted" style="font-size: 0.7em;">
-                                                            {% if channel.last_live_duration %}⏳ {{ channel.last_live_duration }}<br>{% endif %}
-                                                            {% if channel.last_live_start %}🕒 Início: {{ channel.last_live_start[11:16] }}{% endif %}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            {% endif %}
-
-                                            <!-- SEÇÃO VÍDEO (Último vídeo gravado) -->
-                                            {% if channel.last_video_id %}
-                                                <div class="d-flex align-items-center">
-                                                    {% if channel.last_video_thumb %}
-                                                        <img src="{{ channel.last_video_thumb }}" class="rounded me-2 border border-secondary" style="width: 60px; height: auto; cursor: pointer;" onclick="showImage('{{ channel.last_video_thumb }}', '{{ channel.last_video_id }}')" title="Ver Vídeo">
-                                                    {% endif %}
-                                                    <div style="line-height: 1.2;">
-                                                        <a href="https://www.youtube.com/watch?v={{ channel.last_video_id }}" target="_blank" class="text-decoration-none fw-bold small text-light">Vídeo Novo 🔗</a>
-                                                        <div class="text-muted" style="font-size: 0.7em;">
-                                                            {% if channel.last_video_duration %}⏱️ {{ channel.last_video_duration }}<br>{% endif %}
-                                                            {% if channel.last_video_published %}📅 {{ channel.last_video_published[:10] }}{% endif %}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            {% elif not channel.is_live %}
-                                                <span class="text-muted small">-</span>
-                                            {% endif %}
-                                        </td>
-                                        <td class="text-end">
-                                            {# Lógica do Botão de Mute #}
-                                            {% set live_muted = channel.is_live and channel.muted_live_id == channel.last_live_id %}
-                                            
-                                            {% if channel.is_live %}
-                                                {# Botão para Live Específica #}
-                                                <a href="/toggle_mute/{{ channel.id }}" class="btn btn-{{ 'warning' if live_muted else 'outline-danger' }} btn-sm me-1" title="{{ 'Reativar avisos desta Live' if live_muted else 'Silenciar APENAS esta Live' }}">{{ '🔇 Live' if live_muted else '🔕 Live' }}</a>
-                                            {% else %}
-                                                {# Botão Global #}
-                                                <a href="/toggle_mute/{{ channel.id }}" class="btn btn-{{ 'secondary' if channel.mute_notifications else 'outline-secondary' }} btn-sm me-1" title="{{ 'Ativar Notificações' if channel.mute_notifications else 'Silenciar Canal' }}">{{ '🔔' if channel.mute_notifications else '🔕' }}</a>
-                                            {% endif %}
-                                            
-                                            <a href="/test_live/{{ channel.id }}" class="btn btn-warning btn-sm me-1" title="Simular Notificação de Live">📢</a>
-                                            <a href="/delete_channel/{{ channel.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Tem certeza?')">🗑️</a>
-                                        </td>
-                                    </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td colspan="3" class="text-center py-4 text-muted">Nenhum canal cadastrado ainda.</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+        <div class="row g-4">
+            <!-- Lista de Canais -->
+            <div class="col-lg-8 order-1">
+                <section class="rf-card overflow-hidden" aria-label="Canais monitorados">
+                    <div class="rf-card-head d-flex flex-wrap align-items-center gap-2">
+                        <h2 class="h6 mb-0 me-auto">Canais Monitorados</h2>
+                        <div class="position-relative">
+                            <i class="bi bi-search position-absolute text-secondary" style="left: 11px; top: 50%; transform: translateY(-50%);"></i>
+                            <input type="search" id="search" class="form-control" style="padding-left: 32px; height: 40px; width: 210px;" placeholder="Buscar canal…" aria-label="Buscar canal" oninput="applyFilter()">
+                        </div>
+                        <div class="seg d-flex gap-1" role="group" aria-label="Filtro">
+                            <button type="button" class="btn active" data-filter="all" onclick="setFilter(this)">Todos</button>
+                            <button type="button" class="btn" data-filter="live" onclick="setFilter(this)">Ao vivo</button>
+                            <button type="button" class="btn" data-filter="muted" onclick="setFilter(this)">Silenciados</button>
                         </div>
                     </div>
-                </div>
+
+                    <div id="channelList">
+                        {% for channel in channels %}
+                        {% set live_muted = channel.is_live and channel.last_live_id and channel.muted_live_id == channel.last_live_id %}
+                        <div class="ch-row{{ ' is-live' if channel.is_live }}"
+                             data-id="{{ channel.id }}"
+                             data-name="{{ channel.name|lower }}"
+                             data-live="{{ 1 if channel.is_live and channel.last_live_id else 0 }}"
+                             data-muted="{{ 1 if channel.mute_notifications else 0 }}"
+                             data-live-muted="{{ 1 if live_muted else 0 }}">
+
+                            <!-- Canal -->
+                            <div class="d-flex align-items-center gap-3" style="flex: 1 1 200px; min-width: 0;">
+                                <div class="ch-avatar" aria-hidden="true" data-hue="{{ channel.channel_id }}">{{ channel.name[:1]|upper }}</div>
+                                <div style="min-width: 0;">
+                                    <div class="d-flex flex-wrap align-items-center gap-1 fw-semibold">
+                                        <span class="ch-name">{{ channel.name }}</span>
+                                        {% if channel.is_live %}<span class="ch-badge badge-live">AO VIVO</span>{% endif %}
+                                        <span class="ch-badge badge-muted{{ '' if channel.mute_notifications else ' d-none' }}" title="Canal Silenciado Globalmente">Mudo</span>
+                                        <span class="ch-badge badge-live-muted{{ '' if live_muted and not channel.mute_notifications else ' d-none' }}" title="Apenas esta live está silenciada">Live muta</span>
+                                    </div>
+                                    <div class="ch-id">{{ channel.channel_id }}</div>
+                                </div>
+                            </div>
+
+                            <!-- Live / Último vídeo -->
+                            <div class="d-flex flex-column gap-2" style="flex: 1 1 260px; min-width: 0;">
+                                {% if channel.is_live and channel.last_live_id %}
+                                <div class="media-link live">
+                                    {% if channel.last_live_thumb %}
+                                    <img src="{{ channel.last_live_thumb }}" class="media-thumb" alt="" onclick="showImage(this.src, '{{ channel.last_live_id }}')">
+                                    {% endif %}
+                                    <div style="line-height: 1.3;">
+                                        <a href="https://www.youtube.com/watch?v={{ channel.last_live_id }}" target="_blank" rel="noopener" class="media-title text-decoration-none" style="color: #ff8f8f;"><i class="bi bi-broadcast"></i> Assistir live</a>
+                                        <div class="media-meta" style="color: #c7a3a6;">
+                                            {% if channel.last_live_start %}No ar <time class="rel-time" datetime="{{ channel.last_live_start }}">desde {{ channel.last_live_start[11:16] }}</time>{% endif %}
+                                            {% if channel.last_live_duration %} · {{ channel.last_live_duration }}{% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                {% if channel.last_video_id %}
+                                <div class="media-link">
+                                    {% if channel.last_video_thumb %}
+                                    <img src="{{ channel.last_video_thumb }}" class="media-thumb" alt="" onclick="showImage(this.src, '{{ channel.last_video_id }}')">
+                                    {% endif %}
+                                    <div style="line-height: 1.3;">
+                                        <a href="https://www.youtube.com/watch?v={{ channel.last_video_id }}" target="_blank" rel="noopener" class="media-title text-decoration-none" style="color: #8fb4ff;">Último vídeo <i class="bi bi-box-arrow-up-right small"></i></a>
+                                        <div class="media-meta">
+                                            {% if channel.last_video_published %}<time class="rel-time" datetime="{{ channel.last_video_published }}">{{ channel.last_video_published[:10] }}</time>{% endif %}
+                                            {% if channel.last_video_duration %} · {{ channel.last_video_duration }}{% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% elif not channel.is_live %}
+                                <span class="text-secondary small">-</span>
+                                {% endif %}
+                            </div>
+
+                            <!-- Ações -->
+                            <div class="ms-auto" style="flex: none;">
+                                <div class="actions d-flex gap-2">
+                                    <button type="button" class="btn btn-rf icon-btn btn-mute" onclick="toggleMute(this)"><i class="bi"></i></button>
+                                    <button type="button" class="btn btn-rf icon-btn" onclick="testLive(this)" title="Simular Notificação de Live" aria-label="Simular Notificação de Live"><i class="bi bi-megaphone"></i></button>
+                                    <button type="button" class="btn btn-rf icon-btn danger" onclick="askDelete(this, true)" title="Remover canal" aria-label="Remover canal"><i class="bi bi-trash3"></i></button>
+                                </div>
+                                <div class="confirm d-none align-items-center gap-2">
+                                    <span class="small" style="color: #ffb3b3;">Remover?</span>
+                                    <button type="button" class="btn btn-danger btn-sm fw-semibold" style="height: 40px;" onclick="deleteChannel(this)">Sim</button>
+                                    <button type="button" class="btn btn-rf btn-sm" style="height: 40px;" onclick="askDelete(this, false)">Não</button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div id="emptyMsg" class="text-center py-4 text-secondary{{ '' if not channels else ' d-none' }}">
+                        {{ 'Nenhum canal cadastrado ainda.' if not channels else 'Nenhum canal encontrado com esse filtro.' }}
+                    </div>
+                </section>
+            </div>
+
+            <!-- Coluna Lateral -->
+            <div class="col-lg-4 order-2 d-flex flex-column gap-3">
+
+                <!-- Adicionar Canal -->
+                <section class="rf-card p-3">
+                    <h2 class="h6 mb-2">Adicionar canal</h2>
+                    <form action="/add_channel" method="POST" class="d-flex flex-column gap-2">
+                        <label class="small text-secondary" for="identifier">@handle, ID ou URL</label>
+                        <input type="text" id="identifier" name="identifier" class="form-control" placeholder="@Canal ou ID" required style="height: 40px;">
+                        <button type="submit" class="btn btn-primary fw-semibold" style="height: 40px;">Adicionar</button>
+                    </form>
+                </section>
+
+                <!-- Configurações -->
+                <section class="rf-card overflow-hidden">
+                    <button type="button" class="btn w-100 d-flex justify-content-between align-items-center px-3 fw-semibold border-0" style="height: 52px;" data-bs-toggle="collapse" data-bs-target="#configCollapse" aria-expanded="false" aria-controls="configCollapse">
+                        <span><i class="bi bi-gear me-1"></i> Configurações</span>
+                        <i class="bi bi-chevron-down text-secondary"></i>
+                    </button>
+                    <div class="collapse" id="configCollapse">
+                        <form action="/update_config" method="POST" class="px-3 pb-3 d-flex flex-column gap-4">
+
+                            <div class="d-flex flex-column gap-2">
+                                <div class="section-label">Verificação</div>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <label class="small text-secondary" for="cfgInterval">Intervalo (min)</label>
+                                        <input type="number" id="cfgInterval" name="interval" class="form-control" value="{{ config.check_interval_minutes }}" min="1" required>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="small text-secondary" for="cfgCooldown">Repetir aviso de live (min)</label>
+                                        <input type="number" id="cfgCooldown" name="cooldown" class="form-control" value="{{ config.live_cooldown_minutes or 120 }}" min="10" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex flex-column gap-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="section-label">Modo silencioso</div>
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="muteEnabled" aria-label="Ativar modo silencioso" {{ 'checked' if mute_enabled }} onchange="syncQuietMode()">
+                                    </div>
+                                </div>
+                                <div id="quietHours" class="d-flex align-items-center gap-2 small text-secondary">
+                                    Das
+                                    <select name="mute_start" class="form-select form-select-sm w-auto" aria-label="Início do modo silencioso">
+                                        {% for h in range(24) %}<option value="{{ h }}"{{ ' selected' if (mute_enabled and config.mute_start_hour == h) or (not mute_enabled and h == 23) }}>{{ '%02d'|format(h) }}:00</option>{% endfor %}
+                                    </select>
+                                    às
+                                    <select name="mute_end" class="form-select form-select-sm w-auto" aria-label="Fim do modo silencioso">
+                                        {% for h in range(24) %}<option value="{{ h }}"{{ ' selected' if (mute_enabled and config.mute_end_hour == h) or (not mute_enabled and h == 7) }}>{{ '%02d'|format(h) }}:00</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <div class="small" style="color: var(--rf-faint);">Avisos nesse horário vão para a fila e são enviados depois.</div>
+                            </div>
+
+                            <div class="d-flex flex-column gap-2">
+                                <div class="section-label">Telegram</div>
+                                <div>
+                                    <label class="small text-secondary" for="cfgToken">Token do bot</label>
+                                    <input type="password" id="cfgToken" name="tg_token" class="form-control{{ ' border-success' if tg_token_configured }}" autocomplete="off"
+                                           placeholder="{{ 'Configurado ✓ (deixe vazio para manter)' if tg_token_configured else 'Token do BotFather' }}">
+                                </div>
+                                <div>
+                                    <label class="small text-secondary" for="cfgChatId">Chat ID</label>
+                                    <div class="input-group">
+                                        <input type="text" id="cfgChatId" name="tg_chat_id" class="form-control" value="{{ config.telegram_chat_id or '' }}" placeholder="Seu ID numérico">
+                                        <button type="button" class="btn btn-rf" onclick="findChatId()">Descobrir</button>
+                                    </div>
+                                    <div id="chatIdResult" class="small text-secondary mt-1"></div>
+                                </div>
+                                <button type="button" class="btn btn-rf" onclick="testTelegram()"><i class="bi bi-send"></i> Enviar mensagem de teste</button>
+                            </div>
+
+                            <div class="d-flex flex-column gap-2">
+                                <div class="section-label">API do YouTube</div>
+                                <label class="small text-secondary" for="cfgApi">URL</label>
+                                <input type="text" id="cfgApi" name="api_url" class="form-control font-monospace" value="{{ config.youtube_api_url or '' }}" placeholder="http://ip-do-raspberry:8000">
+                            </div>
+
+                            <button type="submit" class="btn btn-primary fw-semibold" style="height: 44px;">Salvar configurações</button>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- Backup -->
+                <section class="rf-card p-3">
+                    <h2 class="h6 mb-2">Backup & Restauração</h2>
+                    <div class="d-grid gap-2" style="grid-template-columns: 1fr 1fr;">
+                        <a href="/export_channels" class="btn btn-rf"><i class="bi bi-download"></i> Exportar</a>
+                        <button type="button" class="btn btn-rf" data-bs-toggle="modal" data-bs-target="#backupModal"><i class="bi bi-upload"></i> Importar</button>
+                    </div>
+                </section>
             </div>
         </div>
     </div>
 
-    <!-- Modal Backup -->
+    <!-- Modal Importar -->
     <div class="modal fade" id="backupModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">💾 Backup & Restauração</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title">Importar lista de canais</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="d-grid gap-2 mb-3">
-                        <a href="/export_channels" class="btn btn-outline-dark">⬇️ Exportar Lista Atual (JSON)</a>
-                    </div>
-                    <hr>
                     <form action="/import_channels" method="POST" enctype="multipart/form-data">
-                        <label class="form-label fw-bold">Importar Lista</label>
                         <div class="input-group">
                             <input type="file" name="file" class="form-control" accept=".json" required>
-                            <button class="btn btn-outline-success" type="submit">⬆️ Importar</button>
+                            <button class="btn btn-outline-success" type="submit"><i class="bi bi-upload"></i> Importar</button>
                         </div>
                         <div class="form-text">O arquivo deve ser um JSON com lista de objetos contendo "id" e "title".</div>
                     </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Terminal de Logs -->
-    <div class="modal fade modal-terminal" id="logModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">_SYSTEM_LOGS.exe</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body p-0">
-                    <div id="terminalContent" class="terminal-body">
-                        Carregando dados do sistema...
-                    </div>
-                </div>
-                <div class="modal-footer border-secondary">
-                    <div class="form-check form-switch me-auto">
-                        <input class="form-check-input" type="checkbox" id="chkFullLogs" onchange="loadLogs()">
-                        <label class="form-check-label text-muted small" for="chkFullLogs">Modo Detalhado (Debug)</label>
-                    </div>
-                    <button type="button" class="btn btn-sm btn-outline-success" onclick="loadLogs()">🔄 Atualizar</button>
-                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Fechar</button>
                 </div>
             </div>
         </div>
@@ -298,78 +383,324 @@
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content bg-dark border-secondary">
                 <div class="modal-body text-center p-1">
-                    <img id="modalImage" src="" class="img-fluid rounded mb-2">
+                    <img id="modalImage" src="" class="img-fluid rounded mb-2" alt="">
                     <br>
-                    <a id="modalLink" href="#" target="_blank" class="btn btn-outline-light btn-sm mb-2">📺 Abrir no YouTube</a>
+                    <a id="modalLink" href="#" target="_blank" rel="noopener" class="btn btn-outline-light btn-sm mb-2">📺 Abrir no YouTube</a>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal Loading (Feedback Visual) -->
-    <div class="modal fade" id="loadingModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content bg-dark border-secondary">
-                <div class="modal-body text-center py-4">
-                    <h5 class="text-success font-monospace mb-3">EXECUTANDO VARREDURA...</h5>
-                    
-                    <div class="progress mb-3" style="height: 25px; background-color: #333;">
-                        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 0%">0%</div>
-                    </div>
-                    
-                    <p id="progressText" class="text-light font-monospace small mb-0">Iniciando motores...</p>
-                </div>
-            </div>
-        </div>
-    </div>
+    <div class="toast-area" id="toastArea" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        const logModal = new bootstrap.Modal(document.getElementById('logModal'));
+        // ---------- Utilitários ----------
+        function post(url) {
+            return fetch(url, { method: 'POST', headers: { 'X-Requested-With': 'fetch' } })
+                .then(r => r.json().catch(() => ({ ok: false, message: 'Resposta inválida do servidor (HTTP ' + r.status + ')' })));
+        }
 
-        function openLogModal() {
-            logModal.show();
-            loadLogs();
+        function toast(message, ok = true) {
+            const el = document.createElement('div');
+            el.className = 'alert alert-' + (ok ? 'success' : 'danger') + ' alert-dismissible shadow mb-0';
+            el.setAttribute('role', 'status');
+            el.textContent = message;
+            const close = document.createElement('button');
+            close.type = 'button';
+            close.className = 'btn-close';
+            close.setAttribute('aria-label', 'Fechar');
+            close.onclick = () => el.remove();
+            el.appendChild(close);
+            document.getElementById('toastArea').appendChild(el);
+            setTimeout(() => el.remove(), 6000);
+        }
+
+        function rowOf(el) { return el.closest('.ch-row'); }
+
+        // ---------- Tempo relativo ----------
+        function relTime(date) {
+            const s = Math.round((Date.now() - date.getTime()) / 1000);
+            if (s < 60) return 'agora';
+            const m = Math.round(s / 60);
+            if (m < 60) return 'há ' + m + ' min';
+            const h = Math.round(m / 60);
+            if (h < 24) return 'há ' + h + ' h';
+            const d = Math.round(h / 24);
+            if (d === 1) return 'ontem';
+            if (d < 30) return 'há ' + d + ' dias';
+            return date.toLocaleDateString('pt-BR');
+        }
+
+        function renderRelTimes() {
+            document.querySelectorAll('time.rel-time').forEach(t => {
+                const d = new Date(t.getAttribute('datetime'));
+                if (isNaN(d)) return;
+                t.textContent = relTime(d);
+                t.title = d.toLocaleString('pt-BR');
+            });
+        }
+
+        // ---------- Contagem regressiva ----------
+        const countdownEl = document.getElementById('countdown');
+        let secondsLeft = countdownEl.dataset.seconds === '' ? null : parseInt(countdownEl.dataset.seconds, 10);
+
+        function tickCountdown() {
+            if (secondsLeft === null) return;
+            if (secondsLeft <= 0) { countdownEl.textContent = 'agora'; return; }
+            const m = Math.floor(secondsLeft / 60), s = secondsLeft % 60;
+            countdownEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+            secondsLeft--;
+        }
+
+        // ---------- Estado de cada linha (mute / badges) ----------
+        function hueOf(text) {
+            let h = 0;
+            for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) % 360;
+            return h;
+        }
+
+        function paintRow(row) {
+            const live = row.dataset.live === '1';
+            const muted = row.dataset.muted === '1';
+            const liveMuted = row.dataset.liveMuted === '1';
+            const btn = row.querySelector('.btn-mute');
+            const icon = btn.querySelector('i');
+            const on = live ? liveMuted : muted;
+            const label = live
+                ? (liveMuted ? 'Reativar avisos desta Live' : 'Silenciar APENAS esta Live')
+                : (muted ? 'Ativar Notificações' : 'Silenciar Canal');
+            btn.classList.toggle('on', on);
+            btn.title = label;
+            btn.setAttribute('aria-label', label);
+            icon.className = 'bi ' + (on ? 'bi-bell-slash-fill' : 'bi-bell');
+            row.querySelector('.badge-muted').classList.toggle('d-none', !muted);
+            row.querySelector('.badge-live-muted').classList.toggle('d-none', muted || !(live && liveMuted));
+        }
+
+        function updateStats() {
+            const rows = [...document.querySelectorAll('.ch-row')];
+            document.getElementById('statTotal').textContent = rows.length;
+            document.getElementById('statLive').textContent = rows.filter(r => r.dataset.live === '1').length;
+            document.getElementById('statMuted').textContent = rows.filter(r => r.dataset.muted === '1' || r.dataset.liveMuted === '1').length;
+        }
+
+        // ---------- Busca e filtro ----------
+        let currentFilter = 'all';
+
+        function setFilter(btn) {
+            document.querySelectorAll('.seg .btn').forEach(b => {
+                b.classList.toggle('active', b === btn);
+                b.setAttribute('aria-pressed', b === btn);
+            });
+            currentFilter = btn.dataset.filter;
+            applyFilter();
+        }
+
+        function applyFilter() {
+            const q = document.getElementById('search').value.trim().toLowerCase();
+            const rows = document.querySelectorAll('.ch-row');
+            let visible = 0;
+            rows.forEach(r => {
+                let show = !q || r.dataset.name.includes(q);
+                if (currentFilter === 'live') show = show && r.dataset.live === '1';
+                if (currentFilter === 'muted') show = show && (r.dataset.muted === '1' || r.dataset.liveMuted === '1');
+                r.classList.toggle('d-none', !show);
+                if (show) visible++;
+            });
+            const empty = document.getElementById('emptyMsg');
+            empty.textContent = rows.length ? 'Nenhum canal encontrado com esse filtro.' : 'Nenhum canal cadastrado ainda.';
+            empty.classList.toggle('d-none', visible > 0);
+        }
+
+        // ---------- Ações por canal (sem recarregar a página) ----------
+        function toggleMute(btn) {
+            const row = rowOf(btn);
+            btn.disabled = true;
+            post('/toggle_mute/' + row.dataset.id)
+                .then(data => {
+                    if (data.ok) {
+                        row.dataset.muted = data.muted ? '1' : '0';
+                        row.dataset.liveMuted = data.live_muted ? '1' : '0';
+                        paintRow(row);
+                        updateStats();
+                        applyFilter();
+                    }
+                    toast(data.message, data.ok);
+                })
+                .catch(err => toast('Erro de conexão: ' + err, false))
+                .finally(() => { btn.disabled = false; });
+        }
+
+        function testLive(btn) {
+            btn.disabled = true;
+            post('/test_live/' + rowOf(btn).dataset.id)
+                .then(data => toast(data.message, data.ok))
+                .catch(err => toast('Erro de conexão: ' + err, false))
+                .finally(() => { btn.disabled = false; });
+        }
+
+        function askDelete(btn, ask) {
+            const row = rowOf(btn);
+            row.querySelector('.actions').classList.toggle('d-none', ask);
+            row.querySelector('.confirm').classList.toggle('d-none', !ask);
+            row.querySelector('.confirm').classList.toggle('d-flex', ask);
+        }
+
+        function deleteChannel(btn) {
+            const row = rowOf(btn);
+            btn.disabled = true;
+            post('/delete_channel/' + row.dataset.id)
+                .then(data => {
+                    if (data.ok) {
+                        row.remove();
+                        updateStats();
+                        applyFilter();
+                    } else {
+                        btn.disabled = false;
+                    }
+                    toast(data.message, data.ok);
+                })
+                .catch(err => { btn.disabled = false; toast('Erro de conexão: ' + err, false); });
+        }
+
+        // ---------- Verificação manual ----------
+        let progressTimer = null;
+
+        function setScanning(on) {
+            const btn = document.getElementById('btnScan');
+            btn.disabled = on;
+            btn.querySelector('span').textContent = on ? 'Verificando…' : 'Verificar agora';
+            btn.querySelector('i').classList.toggle('spin', on);
+        }
+
+        function hideScan() {
+            const box = document.getElementById('scanBox');
+            box.classList.add('d-none');
+            box.classList.remove('d-flex');
         }
 
         function startCheck() {
-            const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-            loadingModal.show();
+            const box = document.getElementById('scanBox');
+            box.classList.remove('d-none');
+            box.classList.add('d-flex');
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('progressText').textContent = 'Iniciando…';
+            setScanning(true);
 
-            // 1. Inicia a verificação no backend
             fetch('/force_check')
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'started' || data.status === 'already_running') {
-                        // 2. Começa a monitorar o progresso
                         monitorProgress();
+                    } else {
+                        throw new Error(data.message || 'Não foi possível iniciar a verificação');
                     }
+                })
+                .catch(err => {
+                    setScanning(false);
+                    hideScan();
+                    toast('Erro ao iniciar verificação: ' + err.message, false);
                 });
         }
 
         function monitorProgress() {
             const progressBar = document.getElementById('progressBar');
             const progressText = document.getElementById('progressText');
+            let failures = 0;
 
-            const interval = setInterval(() => {
+            clearInterval(progressTimer);
+            progressTimer = setInterval(() => {
                 fetch('/progress')
                     .then(response => response.json())
                     .then(data => {
+                        failures = 0;
                         if (data.total > 0) {
-                            const percent = Math.round((data.current / data.total) * 100);
+                            const percent = Math.min(100, Math.round((data.current / data.total) * 100));
                             progressBar.style.width = percent + '%';
-                            progressBar.innerText = percent + '%';
-                            progressText.innerText = `Verificando canal ${data.current} de ${data.total}`;
+                            progressText.textContent = `Canal ${Math.min(data.current, data.total)} de ${data.total}`;
+                        } else if (data.status) {
+                            progressText.textContent = data.status;
                         }
 
-                        if (!data.running && data.current >= data.total && data.total > 0) {
-                            clearInterval(interval);
-                            setTimeout(() => { window.location.reload(); }, 1000);
+                        if (!data.running) {
+                            clearInterval(progressTimer);
+                            setScanning(false);
+                            if (data.status === 'Erro') {
+                                toast('A verificação terminou com erro. Veja os logs.', false);
+                            } else if (data.status === 'Sem canais') {
+                                hideScan();
+                                toast('Nenhum canal cadastrado para verificar.', false);
+                            } else {
+                                progressBar.style.width = '100%';
+                                progressText.textContent = 'Concluído — atualizando…';
+                                setTimeout(() => { window.location.reload(); }, 800);
+                            }
+                        }
+                    })
+                    .catch(() => {
+                        if (++failures >= 5) {
+                            clearInterval(progressTimer);
+                            setScanning(false);
+                            toast('Sem resposta do servidor ao acompanhar a verificação.', false);
                         }
                     });
             }, 1000); // Consulta a cada 1 segundo
         }
 
+        // ---------- Logs ----------
+        function toggleLogs() {
+            const panel = document.getElementById('logPanel');
+            const opening = panel.classList.contains('d-none');
+            panel.classList.toggle('d-none', !opening);
+            if (opening) loadLogs();
+        }
+
+        function loadLogs() {
+            const terminal = document.getElementById('terminalContent');
+            terminal.textContent = 'Conectando ao mainframe...';
+            const fullMode = document.getElementById('chkFullLogs').checked;
+
+            fetch('/logs?full=' + fullMode)
+                .then(response => response.json())
+                .then(data => {
+                    // Texto puro: títulos de vídeo com "<" ou ">" não viram HTML
+                    terminal.textContent = Array.isArray(data) ? data.join('') : (data.error || JSON.stringify(data));
+                    terminal.scrollTop = terminal.scrollHeight;
+                })
+                .catch(err => {
+                    terminal.textContent += '\nERRO DE CONEXÃO: ' + err;
+                });
+        }
+
+        // ---------- Telegram ----------
+        function testTelegram() {
+            post('/test_notification')
+                .then(data => toast(data.message, data.ok))
+                .catch(err => toast('Erro de conexão: ' + err, false));
+        }
+
+        function findChatId() {
+            const out = document.getElementById('chatIdResult');
+            out.textContent = 'Consultando o Telegram…';
+            fetch('/get_chat_id')
+                .then(r => r.json())
+                .then(data => {
+                    out.textContent = Array.isArray(data) ? data.join('\n') : ('Erro: ' + (data.erro || JSON.stringify(data)));
+                    out.style.whiteSpace = 'pre-line';
+                })
+                .catch(err => { out.textContent = 'Erro de conexão: ' + err; });
+        }
+
+        // ---------- Modo silencioso ----------
+        function syncQuietMode() {
+            const on = document.getElementById('muteEnabled').checked;
+            // Selects desabilitados não são enviados -> backend recebe -1 (desativado)
+            document.querySelectorAll('#quietHours select').forEach(s => { s.disabled = !on; });
+            document.getElementById('quietHours').style.opacity = on ? 1 : .5;
+        }
+
+        // ---------- Thumbnail ----------
         function showImage(thumbUrl, videoId) {
             const modal = new bootstrap.Modal(document.getElementById('imageModal'));
             const img = document.getElementById('modalImage');
@@ -380,23 +711,17 @@
             modal.show();
         }
 
-        function loadLogs() {
-            const terminal = document.getElementById('terminalContent');
-            terminal.innerHTML = 'Conectando ao mainframe...<br>';
-            const fullMode = document.getElementById('chkFullLogs').checked;
-            
-            fetch('/logs?full=' + fullMode)
-                .then(response => response.json())
-                .then(data => {
-                    // Limpa e inverte a ordem (mais recente embaixo, estilo terminal real)
-                    terminal.innerHTML = data.join(''); 
-                    // Rola para o final automaticamente
-                    terminal.scrollTop = terminal.scrollHeight;
-                })
-                .catch(err => {
-                    terminal.innerHTML += '<span style="color:red">ERRO DE CONEXÃO: ' + err + '</span>';
-                });
-        }
+        // ---------- Inicialização ----------
+        document.querySelectorAll('.ch-avatar').forEach(a => {
+            a.style.background = 'hsl(' + hueOf(a.dataset.hue) + ', 55%, 68%)';
+        });
+        document.querySelectorAll('.ch-row').forEach(paintRow);
+        updateStats();
+        renderRelTimes();
+        syncQuietMode();
+        tickCountdown();
+        setInterval(tickCountdown, 1000);
+        setInterval(renderRelTimes, 60000);
     </script>
 </body>
 </html>
