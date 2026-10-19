@@ -14,7 +14,6 @@ import logging
 from app.services.youtube_scraper import (
     is_channel_live, 
     get_channel_details, 
-    get_live_stream_duration, 
     process_youtube_clip
 )
 
@@ -39,14 +38,6 @@ class ChannelDetailsResponse(BaseModel):
     """Detalhes de um canal do YouTube."""
     id: str
     title: str
-
-
-class LiveDurationResponse(BaseModel):
-    """Informações de duração de uma live."""
-    video_id: str
-    start_time: str
-    duration_seconds: int
-    duration_str: str
 
 
 # ========== ROUTER ==========
@@ -148,37 +139,6 @@ async def check_live_status_batch(payload: ChannelList):
     
     return response_data
 
-
-@router.get(
-    "/get-live-duration",
-    response_model=LiveDurationResponse,
-    tags=["Live Details"],
-    summary="Obter Duração da Live",
-    description="Calcula há quanto tempo uma transmissão ao vivo está no ar."
-)
-async def get_live_duration_endpoint(video_url: str):
-    """
-    Calcula há quanto tempo uma live está no ar, dado a URL ou ID do vídeo.
-    
-    Args:
-        video_url: URL completa ou ID do vídeo do YouTube
-        
-    Returns:
-        LiveDurationResponse com video_id, start_time e durações
-        
-    Raises:
-        HTTPException 404: Se o vídeo não for encontrado ou não tiver start_time
-    """
-    # O scraper lida com a extração do ID da URL
-    details = await run_in_threadpool(get_live_stream_duration, video_url)
-    
-    if not details:
-        raise HTTPException(
-            status_code=404,
-            detail="Vídeo não encontrado ou horário de início não disponível"
-        )
-    
-    return details
 
 class ClipRequest(BaseModel):
     """Payload para solicitar o corte de um vídeo e transcrição."""

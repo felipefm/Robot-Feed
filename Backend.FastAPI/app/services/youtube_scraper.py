@@ -2,7 +2,6 @@ import requests
 from bs4 import BeautifulSoup
 from typing import Dict, Any
 import re
-from datetime import datetime, timezone
 import os
 import yt_dlp
 from urllib.parse import urlparse, parse_qs
@@ -138,67 +137,6 @@ def is_channel_live(channel_identifier: str) -> tuple[bool, str | None]:
 
     return False, None
 
-def get_live_stream_duration(video_identifier: str) -> Dict[str, Any] | None:
-    """
-    Obtém a duração de uma live stream ativa (tempo decorrido desde o início).
-
-    Args:
-        video_identifier: A URL do vídeo (ex: "https://www.youtube.com/watch?v=...") ou o ID do vídeo.
-
-    Returns:
-        Um dicionário com 'start_time', 'duration_str' e 'duration_seconds', ou None se falhar.
-    """
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-
-    # Extrair ID se for uma URL completa
-    video_id = video_identifier
-    if "v=" in video_identifier:
-        video_id = video_identifier.split("v=")[-1].split("&")[0]
-    elif "youtu.be/" in video_identifier:
-        video_id = video_identifier.split("youtu.be/")[-1].split("?")[0]
-
-    url = f"https://www.youtube.com/watch?v={video_id}"
-
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        # O YouTube geralmente coloca a data de início no HTML dentro de itemprop="startDate"
-        # ou dentro do JSON de configuração. O método mais robusto via scraping simples é o meta tag ou regex no JSON.
-        
-        # Tenta encontrar via Regex no JSON (mais comum para dados precisos de lives agendadas ou passadas)
-        # Procura por "startDate":"2023-10-27T14:00:00-03:00"
-        start_date_match = re.search(r'"startDate":"(.*?)"', response.text)
-        
-        # Fallback: Tenta encontrar "startTimestamp" (comum em lives ativas)
-        if not start_date_match:
-            start_date_match = re.search(r'"startTimestamp":"(.*?)"', response.text)
-        
-        if start_date_match:
-            start_time_str = start_date_match.group(1)
-            # Correção para formato ISO com 'Z' (UTC) que o Python < 3.11 pode não aceitar nativamente
-            if start_time_str.endswith('Z'):
-                start_time_str = start_time_str.replace('Z', '+00:00')
-            # Converte string ISO 8601 para objeto datetime
-            start_time = datetime.fromisoformat(start_time_str)
-            now = datetime.now(start_time.tzinfo) # Usa o mesmo timezone da resposta
-            duration = now - start_time
-            
-            return {
-                "video_id": video_id,
-                "start_time": start_time_str,
-                "duration_seconds": int(duration.total_seconds()),
-                "duration_str": str(duration).split('.')[0] # Remove milissegundos para ficar bonito (H:MM:SS)
-            }
-            
-    except (requests.exceptions.RequestException, ValueError) as e:
-        print(f"Erro ao buscar duração da live {video_id}: {e}")
-        return None
-    
-    return None
-
 def parse_time_to_seconds(time_str: str) -> int:
     """Converte 'MM:SS' ou 'HH:MM:SS' em segundos totais."""
     parts = list(map(int, time_str.split(':')))
@@ -322,9 +260,5 @@ if __name__ == '__main__':
     result_offline = 'Sim' if is_live_offline else 'Não'
     safe_print(f"O canal '{offline_channel_handle}' está ao vivo? {result_offline}")
 
-    # -- Teste de duração --
-    # Nota: Para testar isso, você precisa de um ID de vídeo que esteja ao vivo ou que foi uma live recente.
-    # safe_print("--- Testando get_live_stream_duration ---")
-    # safe_print(get_live_stream_duration("https://www.youtube.com/watch?v=VIDEO_ID_AQUI"))
 
 

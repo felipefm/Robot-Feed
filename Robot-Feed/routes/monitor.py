@@ -21,6 +21,9 @@ monitor_bp = Blueprint('monitor', __name__)
 
 logger = logging.getLogger(__name__)
 
+# Canal sem vídeo novo há esse tanto de dias aparece como "Parado" no dashboard
+STALE_DAYS = 90
+
 # Referência global ao arquivo de log (será injetada por app.py)
 # Veja setup_monitor_blueprint() abaixo
 log_path = None
@@ -88,6 +91,7 @@ def index():
                            last_check=last_check_str, next_check_seconds=next_check_seconds,
                            mute_enabled=mute_enabled,
                            tg_token_configured=bool(config.telegram_token),
+                           stale_days=STALE_DAYS,
                            active_page='monitor')
 
 

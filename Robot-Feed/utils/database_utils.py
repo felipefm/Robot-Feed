@@ -58,16 +58,16 @@ def inspect_and_migrate() -> None:
             except Exception:
                 pass
 
-            # Migração para novos campos de vídeo (Thumb, Published, Duration)
+            # Migração para novos campos de vídeo (Thumb, Published) e de canal indisponível
             new_cols = {
                 'last_video_thumb': 'VARCHAR(200)',
                 'last_video_published': 'VARCHAR(50)',
-                'last_video_duration': 'VARCHAR(20)',
                 'is_live': 'BOOLEAN',
                 'last_live_id': 'VARCHAR(50)',
                 'last_live_thumb': 'VARCHAR(200)',
-                'last_live_start': 'VARCHAR(50)',
-                'last_live_duration': 'VARCHAR(20)'
+                'rss_not_found_count': 'INTEGER DEFAULT 0',
+                'unavailable_since': 'DATETIME',
+                'notified_video_ids': 'TEXT'
             }
             for col_name, col_type in new_cols.items():
                 try:
@@ -115,6 +115,14 @@ def inspect_and_migrate() -> None:
                 logger.info("Migração: Coluna 'tokens_used' adicionada a video_archive.")
             except Exception:
                 pass
+
+            # Migração para notificações com foto na fila do Modo Silencioso
+            for col_name, col_type in {'photo_urls': 'TEXT', 'button_url': 'VARCHAR(255)'}.items():
+                try:
+                    conn.execute(text(f"ALTER TABLE notification_queue ADD COLUMN {col_name} {col_type}"))
+                    logger.info(f"Migração: Coluna '{col_name}' adicionada a notification_queue.")
+                except Exception:
+                    pass
 
             # Bloco seguro para garantir a criação da tabela VideoArchive
             try:

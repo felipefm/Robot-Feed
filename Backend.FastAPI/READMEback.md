@@ -54,7 +54,7 @@ A aplicação está organizada no diretório `app/`:
 
 A documentação completa pode ser testada nativamente no Swagger UI. Abaixo estão as categorias principais geridas pelos roteadores modulares:
 
-* **YouTube & Twitch (`/app/api/routers/youtube.py`):** Status de lives, detalhes de canais e duração de transmissões.
+* **YouTube & Twitch (`/app/api/routers/youtube.py`):** Status de lives e detalhes de canais.
 * **Video & Text Summary (`/app/api/routers/summarizer.py`):** Resumo inteligente via Multi-LLM para vídeos do YouTube e textos avulsos.
 * **Auctions (`/app/api/routers/auctions.py`):** Motor de busca em dezenas de sites de leilão, salvamento em cache e histórico local.
 * **Document Extraction (`/app/api/routers/documents.py`):** Processamento, extração e fatiamento inteligente de arquivos PDF e EPUB.

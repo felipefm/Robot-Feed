@@ -15,14 +15,14 @@ class Channel(db.Model):
     last_live_notify = db.Column(db.DateTime, nullable=True)  # Data do último aviso de Live
     last_video_thumb = db.Column(db.String(200), nullable=True)
     last_video_published = db.Column(db.String(50), nullable=True)
-    last_video_duration = db.Column(db.String(20), nullable=True)
     is_live = db.Column(db.Boolean, default=False)
     last_live_id = db.Column(db.String(50), nullable=True)
     last_live_thumb = db.Column(db.String(200), nullable=True)
-    last_live_start = db.Column(db.String(50), nullable=True)
-    last_live_duration = db.Column(db.String(20), nullable=True)
     mute_notifications = db.Column(db.Boolean, default=False)
     muted_live_id = db.Column(db.String(50), nullable=True)  # ID da live específica silenciada
+    rss_not_found_count = db.Column(db.Integer, default=0)  # 404 seguidos no RSS do canal
+    unavailable_since = db.Column(db.DateTime, nullable=True)  # Canal removido/encerrado no YouTube
+    notified_video_ids = db.Column(db.Text, nullable=True)  # Últimos IDs notificados (separados por espaço, mais recente primeiro)
 
 
 class NotificationQueue(db.Model):
@@ -31,6 +31,8 @@ class NotificationQueue(db.Model):
     message = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
     status = db.Column(db.String(20), default='pending')
+    photo_urls = db.Column(db.Text, nullable=True)  # Miniaturas candidatas (uma por linha) para envio como foto
+    button_url = db.Column(db.String(255), nullable=True)  # Link do botão "Assistir"
 
 
 class SummaryQueue(db.Model):

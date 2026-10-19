@@ -3,6 +3,7 @@ telegram_bot.py - Lógica de Telegram, fila de mensagens e modo silencioso
 """
 
 import logging
+import json
 import requests
 import time
 import threading
@@ -15,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 # Variável global para controlar estado do Mute
 mute_status = {'active': False}
+
+TELEGRAM_CAPTION_LIMIT = 1024
 
 
 def is_mute_active(conf):
@@ -34,83 +37,168 @@ def is_mute_active(conf):
         return start <= now_hour < end
 
 
-def send_telegram_message(message, force=False):
-    """Envia notificação para o Telegram ou enfileira se estiver em modo silencioso"""
+def youtube_thumbnail_candidates(video_id, feed_thumb=None, live=False):
+    """Lista de URLs de miniatura do vídeo, da preferida para a de menor qualidade.
+    maxresdefault (16:9, sem faixas pretas) vem primeiro; em vídeos recém-publicados ela pode
+    ainda não existir, e o download pula para a próxima (hqdefault é 4:3, com faixas pretas).
+    live=True prioriza as versões _live, que mostram o quadro atual da transmissão."""
+    names = ['maxresdefault_live', 'hqdefault_live'] if live else []
+    names += ['maxresdefault']
+    candidates = [f"https://i.ytimg.com/vi/{video_id}/{name}.jpg" for name in names]
+    if feed_thumb:
+        candidates.append(feed_thumb)
+    candidates += [f"https://i.ytimg.com/vi/{video_id}/{name}.jpg" for name in ('hqdefault', 'mqdefault')]
+    return list(dict.fromkeys(candidates))  # Remove duplicadas mantendo a ordem
+
+
+def _download_thumbnail(photo_urls):
+    """Baixa a primeira miniatura válida (ignora 404 e o placeholder cinza do YouTube)"""
+    for photo_url in photo_urls:
+        try:
+            resp = requests.get(photo_url, timeout=10)
+            content_type = resp.headers.get('Content-Type', '')
+            if resp.status_code == 200 and content_type.startswith('image/') and len(resp.content) > 2000:
+                return resp.content
+            logger.debug(f"Telegram: Miniatura inválida ({resp.status_code}, {content_type}, {len(resp.content)} bytes): {photo_url}")
+        except Exception as e:
+            logger.debug(f"Telegram: Falha ao baixar miniatura {photo_url}: {e}")
+    return None
+
+
+TELEGRAM_429_RETRIES = 3   # Reenvios da mesma mensagem após "429 Too Many Requests"
+TELEGRAM_MAX_WAIT = 60     # Espera máxima (s) por reenvio, mesmo que o Telegram peça mais
+
+
+def _retry_after(response):
+    """Segundos pedidos pelo Telegram num 429 (parameters.retry_after)"""
+    try:
+        return int(response.json().get('parameters', {}).get('retry_after', 5))
+    except Exception:
+        return 5
+
+
+def _telegram_post(conf, method, **kwargs):
+    """Chama um método da API do Telegram e retorna (sucesso, mensagem de erro).
+    Num 429 espera o retry_after informado e reenvia a mesma mensagem."""
+    url = f"https://api.telegram.org/bot{conf.telegram_token}/{method}"
+    try:
+        for attempt in range(TELEGRAM_429_RETRIES + 1):
+            response = requests.post(url, timeout=15, **kwargs)
+            if response.status_code != 429 or attempt == TELEGRAM_429_RETRIES:
+                break
+            wait = min(_retry_after(response), TELEGRAM_MAX_WAIT) + 1
+            logger.warning(f"Telegram: Limite de envio (429) em {method}. Aguardando {wait}s para reenviar "
+                           f"({attempt + 1}/{TELEGRAM_429_RETRIES})...")
+            time.sleep(wait)
+
+        if response.status_code == 200:
+            # Log Técnico (DEBUG): O JSON completo com offsets, bolds, etc.
+            logger.debug(f"Telegram API Raw ({method}): {response.text}")
+            return True, "Sucesso"
+        # Melhora o log para identificar erro comum de "chat not found"
+        error_msg = response.text
+        if response.status_code == 400 and "chat not found" in error_msg:
+            error_msg += " -> DICA: Você iniciou a conversa com o bot? Envie /start para ele no Telegram."
+        logger.error(f"Telegram: Erro na API {method} (Status {response.status_code}): {error_msg}")
+        return False, f"Erro API ({response.status_code}): {error_msg}"
+    except Exception as e:
+        logger.error(f"Telegram: Falha de Conexão em {method} (Exception): {e}")
+        return False, f"Erro de Conexão: {str(e)}"
+
+
+def _deliver(conf, message, photo_urls=None, button_url=None):
+    """Envia de fato a mensagem. Com photo_urls, tenta foto em cascata:
+    1. Baixa a miniatura e faz upload (não depende do Telegram conseguir buscar a URL)
+    2. Se o download falhar, manda a URL da miniatura para o Telegram buscar
+    3. Se nada der certo, cai para o texto com preview de link (formato antigo)"""
+    reply_markup = {"inline_keyboard": [[{"text": "▶️ Assistir", "url": button_url}]]} if button_url else None
+
+    # Legenda de foto tem limite de 1024 caracteres (texto comum: 4096)
+    if photo_urls and len(message) <= TELEGRAM_CAPTION_LIMIT:
+        data = {"chat_id": conf.telegram_chat_id, "caption": message, "parse_mode": "HTML"}
+        if reply_markup:
+            data["reply_markup"] = json.dumps(reply_markup)
+
+        image = _download_thumbnail(photo_urls)
+        if image:
+            ok, info = _telegram_post(conf, "sendPhoto", data=data, files={"photo": ("thumb.jpg", image, "image/jpeg")})
+        else:
+            logger.warning("Telegram: Nenhuma miniatura baixada. Tentando enviar a foto por URL.")
+            ok, info = _telegram_post(conf, "sendPhoto", data={**data, "photo": photo_urls[0]})
+        if ok:
+            logger.info("Telegram: Foto enviada com sucesso! ✅")
+            return True, "Sucesso"
+        logger.warning("Telegram: Envio com foto falhou. Usando fallback de texto.")
+
+    payload = {"chat_id": conf.telegram_chat_id, "text": message, "parse_mode": "HTML"}
+    if photo_urls:
+        payload["link_preview_options"] = {"prefer_large_media": True}
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    ok, info = _telegram_post(conf, "sendMessage", json=payload)
+    if ok:
+        # Log Limpo: Apenas confirmação
+        logger.info("Telegram: Mensagem enviada com sucesso! ✅")
+    return ok, info
+
+
+def send_telegram_message(message, force=False, photo_urls=None, button_url=None):
+    """Envia notificação para o Telegram ou enfileira se estiver em modo silencioso.
+    photo_urls: miniaturas candidatas (envia como foto com legenda); button_url: link do botão "Assistir"."""
     conf = get_config()
     if not conf.telegram_token or not conf.telegram_chat_id:
         logger.warning("Telegram não configurado. Mensagem ignorada.")
         return False, "Telegram não configurado."
-    
+
     # Verifica Modo Silencioso
     if not force and is_mute_active(conf):
         # Verifica duplicidade na fila pendente
         exists = NotificationQueue.query.filter_by(message=message, status='pending').first()
         if not exists:
-            new_item = NotificationQueue(message=message)
+            new_item = NotificationQueue(message=message,
+                                         photo_urls="\n".join(photo_urls) if photo_urls else None,
+                                         button_url=button_url)
             db.session.add(new_item)
             db.session.commit()
             logger.info(f"Modo Silencioso ATIVO: Mensagem enfileirada (ID: {new_item.id}). Conteúdo: {message[:50]}...")
             return True, "Enfileirado (Modo Silencioso)"
         logger.info(f"Modo Silencioso: Mensagem duplicada ignorada. Conteúdo: {message[:50]}...")
         return True, "Duplicado na fila (Ignorado)"
-    
+
     # Log detalhado para diagnóstico (mascarando o token para segurança)
     token_masked = f"{conf.telegram_token[:5]}...{conf.telegram_token[-5:]}" if conf.telegram_token and len(conf.telegram_token) > 10 else "***"
     logger.debug(f"Telegram: Tentando enviar mensagem... Chat ID: {conf.telegram_chat_id} | Token: {token_masked}")
 
-    url = f"https://api.telegram.org/bot{conf.telegram_token}/sendMessage"
-    payload = {
-        "chat_id": conf.telegram_chat_id,
-        "text": message,
-        "parse_mode": "HTML"
-    }
-    try:
-        response = requests.post(url, json=payload, timeout=10)
-        if response.status_code == 200:
-            # Log Limpo: Apenas confirmação
-            logger.info("Telegram: Mensagem enviada com sucesso! ✅")
-            # Log Técnico (DEBUG): O JSON completo com offsets, bolds, etc.
-            logger.debug(f"Telegram API Raw: {response.text}")
-            return True, "Sucesso"
-        else:
-            # Melhora o log para identificar erro comum de "chat not found"
-            error_msg = response.text
-            if response.status_code == 400 and "chat not found" in error_msg:
-                error_msg += " -> DICA: Você iniciou a conversa com o bot? Envie /start para ele no Telegram."
-            logger.error(f"Telegram: Erro na API (Status {response.status_code}): {error_msg}")
-            return False, f"Erro API ({response.status_code}): {error_msg}"
-    except Exception as e:
-        logger.error(f"Telegram: Falha de Conexão (Exception): {e}")
-        return False, f"Erro de Conexão: {str(e)}"
+    return _deliver(conf, message, photo_urls, button_url)
 
 
 def process_notification_queue():
     """Processa a fila de mensagens pendentes se fora do horário de silêncio"""
     conf = get_config()
-    
+
     # Se ainda estiver no horário mudo, não faz nada
     if is_mute_active(conf):
         return
 
     pending_msgs = NotificationQueue.query.filter_by(status='pending').order_by(NotificationQueue.created_at).all()
-    
+
     if pending_msgs:
         logger.info(f"Processando fila de notificações: {len(pending_msgs)} mensagens.")
         sent_count = 0
-        
+
         for item in pending_msgs:
             # Envia usando a lógica direta da API (bypassando a função send_telegram_message para evitar loop)
-            url = f"https://api.telegram.org/bot{conf.telegram_token}/sendMessage"
-            payload = {"chat_id": conf.telegram_chat_id, "text": item.message, "parse_mode": "HTML"}
-            try:
-                requests.post(url, json=payload, timeout=10)
-                # Marca como enviado ou deleta
+            photo_urls = item.photo_urls.split("\n") if item.photo_urls else None
+            ok, info = _deliver(conf, item.message, photo_urls, item.button_url)
+            if ok:
                 db.session.delete(item)
+                db.session.commit()  # Por item: se o processo cair no meio, o que já saiu não é reenviado
                 sent_count += 1
-            except Exception as e:
-                logger.error(f"Erro ao processar fila msg {item.id}: {e}")
-                # Mantém na fila para tentar depois ou marca erro? Vamos manter por enquanto.
-        
+            else:
+                # Mantém na fila para tentar no próximo ciclo
+                logger.error(f"Erro ao processar fila msg {item.id}: {info}")
+            time.sleep(3)  # Canais do Telegram aceitam ~20 msg/min; 3s mantém a fila abaixo do limite
+
         db.session.commit()
         logger.info(f"Fila de notificações processada. {sent_count}/{len(pending_msgs)} enviadas.")
 

@@ -60,6 +60,8 @@
         .badge-live { background: var(--rf-live); color: #1a0606; font-weight: 700; letter-spacing: .04em; }
         .badge-muted { background: var(--rf-border-2); color: #d4d9e1; }
         .badge-live-muted { background: var(--rf-amber); color: #2a1c00; }
+        .badge-stale { background: #3b3152; color: #d9ccff; }
+        .badge-unavailable { background: #5c2328; color: #ffd0d0; }
         .media-link { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 8px; text-decoration: none; }
         .media-link.live { background: #2a1517; border: 1px solid #5c2328; }
         .media-thumb { position: relative; width: 72px; height: 40px; border-radius: 6px; flex: none; object-fit: cover; cursor: zoom-in; background: var(--rf-surface-2); }
@@ -134,26 +136,33 @@
         </section>
 
         <!-- Cards de Resumo -->
-        <section class="row g-3 mb-4" aria-label="Resumo">
-            <div class="col-6 col-lg-3">
+        <section class="row row-cols-2 row-cols-md-3 row-cols-xl-5 g-3 mb-4" aria-label="Resumo">
+            <div class="col">
                 <div class="rf-card p-3 h-100">
                     <div class="stat-label">Canais</div>
                     <div class="stat-value" id="statTotal">{{ channels|length }}</div>
                 </div>
             </div>
-            <div class="col-6 col-lg-3">
+            <div class="col">
                 <div class="rf-card p-3 h-100">
                     <div class="stat-label">Ao vivo agora</div>
                     <div class="stat-value" id="statLive" style="color: #ff7b7b;">0</div>
                 </div>
             </div>
-            <div class="col-6 col-lg-3">
+            <div class="col">
                 <div class="rf-card p-3 h-100">
                     <div class="stat-label">Silenciados</div>
                     <div class="stat-value" id="statMuted" style="color: var(--rf-amber);">0</div>
                 </div>
             </div>
-            <div class="col-6 col-lg-3">
+            <div class="col">
+                <div class="rf-card p-3 h-100" title="Sem vídeo novo há {{ stale_days }} dias ou mais, ou canal não encontrado no YouTube">
+                    <div class="stat-label">Parados</div>
+                    <div class="stat-value" id="statStale" style="color: #c3a6ff;">0</div>
+                    <div class="small text-secondary"><span id="statUnavailable">0</span> indisponíveis</div>
+                </div>
+            </div>
+            <div class="col">
                 <div class="rf-card p-3 h-100">
                     <div class="stat-label">Próxima verificação</div>
                     <div class="stat-value font-monospace" id="countdown" data-seconds="{{ next_check_seconds if next_check_seconds is not none else '' }}">--:--</div>
@@ -187,7 +196,9 @@
                              data-name="{{ channel.name|lower }}"
                              data-live="{{ 1 if channel.is_live and channel.last_live_id else 0 }}"
                              data-muted="{{ 1 if channel.mute_notifications else 0 }}"
-                             data-live-muted="{{ 1 if live_muted else 0 }}">
+                             data-live-muted="{{ 1 if live_muted else 0 }}"
+                             data-published="{{ channel.last_video_published or '' }}"
+                             data-unavailable="{{ 1 if channel.unavailable_since else 0 }}">
 
                             <!-- Canal -->
                             <div class="d-flex align-items-center gap-3" style="flex: 1 1 200px; min-width: 0;">
@@ -198,6 +209,8 @@
                                         {% if channel.is_live %}<span class="ch-badge badge-live">AO VIVO</span>{% endif %}
                                         <span class="ch-badge badge-muted{{ '' if channel.mute_notifications else ' d-none' }}" title="Canal Silenciado Globalmente">Mudo</span>
                                         <span class="ch-badge badge-live-muted{{ '' if live_muted and not channel.mute_notifications else ' d-none' }}" title="Apenas esta live está silenciada">Live muta</span>
+                                        {% if channel.unavailable_since %}<span class="ch-badge badge-unavailable" title="RSS do canal não encontrado desde {{ channel.unavailable_since.strftime('%d/%m/%Y %H:%M') }} (removido, encerrado ou ID alterado)">Indisponível</span>{% endif %}
+                                        <span class="ch-badge badge-stale d-none"></span>
                                     </div>
                                     <div class="ch-id">{{ channel.channel_id }}</div>
                                 </div>
@@ -212,10 +225,6 @@
                                     {% endif %}
                                     <div style="line-height: 1.3;">
                                         <a href="https://www.youtube.com/watch?v={{ channel.last_live_id }}" target="_blank" rel="noopener" class="media-title text-decoration-none" style="color: #ff8f8f;"><i class="bi bi-broadcast"></i> Assistir live</a>
-                                        <div class="media-meta" style="color: #c7a3a6;">
-                                            {% if channel.last_live_start %}No ar <time class="rel-time" datetime="{{ channel.last_live_start }}">desde {{ channel.last_live_start[11:16] }}</time>{% endif %}
-                                            {% if channel.last_live_duration %} · {{ channel.last_live_duration }}{% endif %}
-                                        </div>
                                     </div>
                                 </div>
                                 {% endif %}
@@ -229,7 +238,6 @@
                                         <a href="https://www.youtube.com/watch?v={{ channel.last_video_id }}" target="_blank" rel="noopener" class="media-title text-decoration-none" style="color: #8fb4ff;">Último vídeo <i class="bi bi-box-arrow-up-right small"></i></a>
                                         <div class="media-meta">
                                             {% if channel.last_video_published %}<time class="rel-time" datetime="{{ channel.last_video_published }}">{{ channel.last_video_published[:10] }}</time>{% endif %}
-                                            {% if channel.last_video_duration %} · {{ channel.last_video_duration }}{% endif %}
                                         </div>
                                     </div>
                                 </div>
@@ -478,11 +486,32 @@
             row.querySelector('.badge-live-muted').classList.toggle('d-none', muted || !(live && liveMuted));
         }
 
+        // ---------- Canais parados ----------
+        const STALE_DAYS = {{ stale_days }};
+
+        function daysSincePublished(row) {
+            const d = new Date(row.dataset.published);
+            return isNaN(d) ? null : Math.floor((Date.now() - d.getTime()) / 86400000);
+        }
+
+        function paintStale(row) {
+            const badge = row.querySelector('.badge-stale');
+            const days = daysSincePublished(row);
+            const stale = row.dataset.unavailable !== '1' && days !== null && days >= STALE_DAYS;
+            badge.classList.toggle('d-none', !stale);
+            if (!stale) return;
+            const years = Math.floor(days / 365);
+            badge.textContent = 'Parado há ' + (years >= 1 ? years + (years === 1 ? ' ano' : ' anos') : Math.floor(days / 30) + ' meses');
+            badge.title = 'Último vídeo publicado há ' + days + ' dias';
+        }
+
         function updateStats() {
             const rows = [...document.querySelectorAll('.ch-row')];
             document.getElementById('statTotal').textContent = rows.length;
             document.getElementById('statLive').textContent = rows.filter(r => r.dataset.live === '1').length;
             document.getElementById('statMuted').textContent = rows.filter(r => r.dataset.muted === '1' || r.dataset.liveMuted === '1').length;
+            document.getElementById('statStale').textContent = rows.filter(r => r.dataset.unavailable === '1' || daysSincePublished(r) >= STALE_DAYS).length;
+            document.getElementById('statUnavailable').textContent = rows.filter(r => r.dataset.unavailable === '1').length;
         }
 
         // ---------- Busca e filtro ----------
@@ -715,7 +744,7 @@
         document.querySelectorAll('.ch-avatar').forEach(a => {
             a.style.background = 'hsl(' + hueOf(a.dataset.hue) + ', 55%, 68%)';
         });
-        document.querySelectorAll('.ch-row').forEach(paintRow);
+        document.querySelectorAll('.ch-row').forEach(row => { paintRow(row); paintStale(row); });
         updateStats();
         renderRelTimes();
         syncQuietMode();

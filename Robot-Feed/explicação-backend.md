@@ -55,7 +55,6 @@ Este projeto é um backend desenvolvido em **Python** utilizando o framework **F
 | `GET` | `/get-channel-details/{identifier}` | Retorna ID e Título de um canal (suporta Handle, ID ou URL). |
 | `GET` | `/check-live/{channel_identifier}` | Verifica se um canal específico está ao vivo no momento. |
 | `POST` | `/check-live-batch` | Verifica o status de múltiplos canais simultaneamente. <br>**Body:** `{"channel_ids": ["@canal1", "UC..."]}` |
-| `GET` | `/get-live-duration` | Retorna a duração atual de uma live (tempo decorrido) baseada na URL do vídeo. |
 
 ### 📝 Resumo de Vídeos (Multi-LLM AI)
 
